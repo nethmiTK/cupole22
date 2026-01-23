@@ -1,26 +1,62 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --page-bg: #FFF1F3;
+  --card-bg: #FFFFFF;
+  --primary: #E11D48;
+  --secondary: #F43F5E;
+  --accent: #FB7185;
+  --text: #1F2937;
+  --muted-text: #6B7280;
+  --background: #FFF1F3;
+  --foreground: var(--text);
+  --font-inter: var(--font-inter);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #07060a;
+    --foreground: #e6e6ea;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
 }
+
+/* Headings: Inter Semibold/Bold */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--primary);
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+}
+
+h1 { font-weight: 700; }
+h2, h3 { font-weight: 600; }
+
+/* Body text */
+p, label, input, button, a, span, li {
+  color: var(--text);
+  font-weight: 400;
+}
+
+.muted { color: var(--muted-text); }
+
+/* Accent utilities */
+.bg-primary { background-color: var(--primary); }
+.bg-accent { background-color: var(--accent); }
+.text-primary { color: var(--primary); }
+.text-accent { color: var(--accent); }
+
+/* Small form tweaks */
+input, textarea {
+  border: 1px solid #e6e6ee;
+}
+
+/* Button focus */
+button:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(225,29,72,0.12);
+}
+
