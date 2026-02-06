@@ -17,18 +17,76 @@ export default function AdminAccountPage() {
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({ name: '', email: '', password: '', role: 'admin' });
 
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
   useEffect(() => {
-    // Simulated data
-    setAdmins([
-      { _id: '1', name: 'Super Admin', email: 'admin@couplecanvas.com', role: 'super_admin', createdAt: '2025-01-01', status: 'active' },
-      { _id: '2', name: 'Manager', email: 'manager@couplecanvas.com', role: 'manager', createdAt: '2025-01-15', status: 'active' },
-    ]);
+    fetchAdmins();
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const fetchAdmins = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_URL}/api/admin/all`);
+      if (res.ok) {
+        const data = await res.json();
+        setAdmins(data.admins || []);
+        setError('');
+      } else {
+        setError('Failed to fetch admins');
+      }
+    } catch (err) {
+      setError('Failed to fetch admins');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Delete admin handler
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this admin?')) return;
+    try {
+      const res = await fetch(`${API_URL}/api/admin/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setSuccess('Admin deleted successfully');
+        fetchAdmins();
+        setTimeout(() => setSuccess(''), 3000);
+      } else {
+        setError('Failed to delete admin');
+      }
+    } catch (err) {
+      setError('Failed to delete admin');
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setShowModal(false);
-    setFormData({ name: '', email: '', password: '', role: 'admin' });
+    if (!formData.name || !formData.email || !formData.password) {
+      setError('All fields are required');
+      return;
+    }
+    try {
+      const res = await fetch(`${API_URL}/api/admin/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      if (res.ok) {
+        setSuccess('Admin added successfully');
+        setShowModal(false);
+        setFormData({ name: '', email: '', password: '', role: 'admin' });
+        fetchAdmins();
+        setTimeout(() => setSuccess(''), 3000);
+      } else {
+        const errData = await res.json();
+        setError(errData.error || 'Failed to add admin');
+      }
+    } catch (err) {
+      setError('Failed to add admin');
+    }
   };
 
   const getRoleColor = (role: string) => {
@@ -71,21 +129,19 @@ export default function AdminAccountPage() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {admins.map((admin) => (
-                <tr key={admin._id} className="hover:bg-gray-50 transition-colors">
+                <tr key={admin._id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-rose-100 rounded-full flex items-center justify-center">
-                        <span className="text-rose-600 font-semibold">
-                          {admin.name.charAt(0).toUpperCase()}
-                        </span>
+                        <span className="text-rose-600 font-semibold">{admin.name.charAt(0).toUpperCase()}</span>
                       </div>
                       <span className="font-medium text-gray-800">{admin.name}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-gray-600">{admin.email}</td>
                   <td className="px-6 py-4">
-                    <span className={`px-3 py-1 text-xs font-medium rounded-full ${getRoleColor(admin.role)}`}>
-                      {admin.role.replace('_', ' ')}
+                    <span className={`px-3 py-1 text-xs font-medium rounded-full ${getRoleColor(admin.role || 'admin')}`}>
+                      {(admin.role || 'admin').replace('_', ' ')}
                     </span>
                   </td>
                   <td className="px-6 py-4">
@@ -95,13 +151,11 @@ export default function AdminAccountPage() {
                       {admin.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-gray-600">
-                    {new Date(admin.createdAt).toLocaleDateString()}
-                  </td>
+                  <td className="px-6 py-4 text-gray-600">{admin.createdAt ? new Date(admin.createdAt).toLocaleDateString() : '-'}</td>
                   <td className="px-6 py-4">
                     <div className="flex gap-2">
                       <button className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">✏️</button>
-                      <button className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors">🗑️</button>
+                      <button onClick={() => handleDelete(admin._id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors">🗑️</button>
                     </div>
                   </td>
                 </tr>
