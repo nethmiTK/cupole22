@@ -18,7 +18,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     const adminData = localStorage.getItem('adminData');
 
     if (!token || !adminData) {
-      router.push('/admin/login');
+      router.push('/login');
       return;
     }
 
@@ -38,9 +38,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100">
       <AdminSidebar />
-      <div className="flex-1 flex flex-col">
+      <div className="ml-64 flex-1 flex flex-col min-h-screen">
         {/* Top Header */}
         <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between">

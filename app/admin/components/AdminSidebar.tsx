@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 
 interface MenuItem {
@@ -13,53 +13,37 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   {
-    name: 'Dashboard',
-    href: '/admin/dashboard',
-  },
-  {
-    name: 'Album Templates',
+    name: 'Album Vendors',
     children: [
-      { name: 'All Albums', href: '/admin/albums-create/albums' },
-      { name: 'All Templates', href: '/admin/albums-create/templates' },
-      { name: 'Create Template', href: '/admin/albums-create/create' },
-      { name: 'Categories', href: '/admin/albums-create/categories' },
-      { name: 'Layout Builder', href: '/admin/albums-create/layout-builder' },
+      { name: 'All Albums', href: '/admin/album-vendors/all' },
+      { name: 'Album Create', href: '/admin/album-vendors/create' },
+      { name: 'Album Editor', href: '/admin/album-vendors/editor' },
+      { name: 'Create Template', href: '/admin/album-vendors/template' },
+      { name: 'Categories', href: '/admin/album-vendors/categories' },
     ],
   },
   {
-    name: 'Contacts Users',
+    name: 'Product Vendors',
     children: [
-      { name: 'Messages', href: '/admin/contacts/messages' },
+      { name: 'All Products', href: '/admin/product-vendors/all' },
+      { name: 'Product Create', href: '/admin/product-vendors/create' },
+      { name: 'Categories', href: '/admin/product-vendors/categories' },
     ],
   },
   {
-    name: 'System Feature',
+    name: 'Proposal Vendors',
     children: [
-      { name: 'System Category', href: '/admin/system/category' },
-      { name: 'System Services', href: '/admin/system/services' },
-      { name: 'Subscription Plans', href: '/admin/system/sub-plans' },
-      { name: 'Admin Account', href: '/admin/system/admin-account' },
+      { name: 'All Proposals', href: '/admin/proposal-vendors/all' },
+      { name: 'Proposal Create', href: '/admin/proposal-vendors/create' },
+      { name: 'Categories', href: '/admin/proposal-vendors/categories' },
     ],
   },
   {
-    name: 'Vendors Manage',
+    name: 'Services Vendors',
     children: [
-      { name: 'All Vendors', href: '/admin/vendors/all' },
-      { name: 'Service Vendors', href: '/admin/vendors/service' },
-      { name: 'Album Vendors', href: '/admin/vendors/album' },
-      { name: 'Proposal Vendors', href: '/admin/vendors/proposal' },
-      { name: 'Product Sale Vendors', href: '/admin/vendors/product' },
-    ],
-  },
-  {
-    name: 'Profit Summary',
-    children: [
-      { name: 'Monthly Report', href: '/admin/profit/monthly' },
-      { name: 'Service Profit Report', href: '/admin/profit/service' },
-      { name: 'Album Vendor Report', href: '/admin/profit/album' },
-      { name: 'Proposal Vendor Report', href: '/admin/profit/proposal' },
-      { name: 'Product Sale Report', href: '/admin/profit/product' },
-      { name: 'Top Sales', href: '/admin/profit/top-sales' },
+      { name: 'All Services', href: '/admin/service-vendors/all' },
+      { name: 'Service Create', href: '/admin/service-vendors/create' },
+      { name: 'Categories', href: '/admin/service-vendors/categories' },
     ],
   },
 ];
@@ -68,7 +52,18 @@ const menuItems: MenuItem[] = [
 export default function AdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const [openMenus, setOpenMenus] = useState<string[]>(['Dashboard']);
+  const [openMenus, setOpenMenus] = useState<string[]>([]);
+
+  // Auto-open menu based on current path
+  useEffect(() => {
+    const activeMenus: string[] = [];
+    menuItems.forEach((item) => {
+      if (item.children?.some((child) => pathname === child.href || pathname.startsWith(child.href))) {
+        activeMenus.push(item.name);
+      }
+    });
+    setOpenMenus((prev) => [...new Set([...prev, ...activeMenus])]);
+  }, [pathname]);
 
   const toggleMenu = (name: string) => {
     setOpenMenus((prev) =>
@@ -81,7 +76,7 @@ export default function AdminSidebar() {
   const handleLogout = () => {
     localStorage.removeItem('adminToken');
     localStorage.removeItem('adminData');
-    router.push('/admin/login');
+    router.push('/login');
   };
 
   const isActive = (href: string) => pathname === href;
@@ -89,7 +84,7 @@ export default function AdminSidebar() {
     children?.some((child) => pathname === child.href);
 
   return (
-    <aside className="w-64 min-h-screen bg-gradient-to-b from-white via-gray-50 to-white text-gray-900 flex flex-col shadow-2xl border-r border-gray-100 rounded-r-2xl">
+    <aside className="w-64 h-screen fixed top-0 left-0 bg-gradient-to-b from-white via-gray-50 to-white text-gray-900 flex flex-col shadow-2xl border-r border-gray-100 z-50 overflow-y-auto">
       {/* Logo */}
       <div className="p-7 border-b border-gray-100 flex flex-col items-center">
         <h1 className="text-3xl font-extrabold tracking-tight text-rose-700 mb-1">CoupleCanvas</h1>
@@ -97,7 +92,7 @@ export default function AdminSidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-6 overflow-visible">
+      <nav className="flex-1 py-6 overflow-y-auto">
         <ul className="space-y-2 px-4">
           {menuItems.map((item) => {
             const parentActive = isParentActive(item.children) || openMenus.includes(item.name);
@@ -134,7 +129,7 @@ export default function AdminSidebar() {
                       </span>
                     </button>
                     <div
-                      className={`transition-all duration-300 ${openMenus.includes(item.name) ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'} overflow-visible`}
+                      className={`transition-all duration-300 overflow-hidden ${openMenus.includes(item.name) ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}
                     >
                       {item.children && (
                         <ul className="mt-2 space-y-1 pl-2">
