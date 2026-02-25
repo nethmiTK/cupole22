@@ -13,38 +13,16 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   {
-    name: 'Album Vendors',
-    children: [
-      { name: 'All Albums', href: '/admin/album-vendors/all' },
-      { name: 'Album Create', href: '/admin/album-vendors/create' },
-      { name: 'Album Editor', href: '/admin/album-vendors/editor' },
-      { name: 'Create Template', href: '/admin/album-vendors/template' },
-      { name: 'Categories', href: '/admin/album-vendors/categories' },
-    ],
+    name: 'Dashboard',
+    href: '/admin/dashboard',
   },
   {
-    name: 'Product Vendors',
-    children: [
-      { name: 'All Products', href: '/admin/product-vendors/all' },
-      { name: 'Product Create', href: '/admin/product-vendors/create' },
-      { name: 'Categories', href: '/admin/product-vendors/categories' },
-    ],
+    name: 'Proposal Vendor',
+    href: '/admin/proposal-vendors',
   },
   {
-    name: 'Proposal Vendors',
-    children: [
-      { name: 'All Proposals', href: '/admin/proposal-vendors/all' },
-      { name: 'Proposal Create', href: '/admin/proposal-vendors/create' },
-      { name: 'Categories', href: '/admin/proposal-vendors/categories' },
-    ],
-  },
-  {
-    name: 'Services Vendors',
-    children: [
-      { name: 'All Services', href: '/admin/service-vendors/all' },
-      { name: 'Service Create', href: '/admin/service-vendors/create' },
-      { name: 'Categories', href: '/admin/service-vendors/categories' },
-    ],
+    name: 'Album Vendor',
+    href: '/admin/album-vendors',
   },
 ];
 
@@ -101,11 +79,10 @@ export default function AdminSidebar() {
                 {item.href ? (
                   <Link
                     href={item.href}
-                    className={`flex items-center px-5 py-3 rounded-xl transition-all duration-200 border border-transparent ${
-                      isActive(item.href)
-                        ? 'bg-rose-600 text-white font-bold border-rose-700 shadow-md'
-                        : 'hover:bg-rose-100 hover:text-rose-700 text-gray-700'
-                    }`}
+                    className={`flex items-center px-5 py-3 rounded-xl transition-all duration-200 border border-transparent ${isActive(item.href)
+                      ? 'bg-rose-600 text-white font-bold border-rose-700 shadow-md'
+                      : 'hover:bg-rose-100 hover:text-rose-700 text-gray-700'
+                      }`}
                   >
                     <span className="font-semibold text-lg">{item.name}</span>
                   </Link>
@@ -113,17 +90,15 @@ export default function AdminSidebar() {
                   <>
                     <button
                       onClick={() => toggleMenu(item.name)}
-                      className={`w-full flex items-center justify-between px-5 py-3 rounded-xl transition-all duration-200 border border-transparent ${
-                        parentActive
-                          ? 'bg-rose-600 text-white font-bold border-rose-700 shadow-md'
-                          : 'hover:bg-rose-100 hover:text-rose-700 text-gray-700'
-                      }`}
+                      className={`w-full flex items-center justify-between px-5 py-3 rounded-xl transition-all duration-200 border border-transparent ${parentActive
+                        ? 'bg-rose-600 text-white font-bold border-rose-700 shadow-md'
+                        : 'hover:bg-rose-100 hover:text-rose-700 text-gray-700'
+                        }`}
                     >
                       <span className="font-semibold text-lg">{item.name}</span>
                       <span
-                        className={`transition-transform duration-300 text-base ml-2 ${
-                          openMenus.includes(item.name) ? 'rotate-180' : ''
-                        }`}
+                        className={`transition-transform duration-300 text-base ml-2 ${openMenus.includes(item.name) ? 'rotate-180' : ''
+                          }`}
                       >
                         ▼
                       </span>
@@ -137,11 +112,10 @@ export default function AdminSidebar() {
                             <li key={child.href}>
                               <Link
                                 href={child.href}
-                                className={`block px-4 py-2 rounded-lg text-base transition-all duration-200 border border-transparent ${
-                                  isActive(child.href)
-                                    ? 'bg-rose-100 text-rose-700 font-semibold border-rose-200 shadow'
-                                    : 'hover:bg-rose-50 hover:text-rose-700 text-gray-700'
-                                }`}
+                                className={`block px-4 py-2 rounded-lg text-base transition-all duration-200 border border-transparent ${isActive(child.href)
+                                  ? 'bg-rose-100 text-rose-700 font-semibold border-rose-200 shadow'
+                                  : 'hover:bg-rose-50 hover:text-rose-700 text-gray-700'
+                                  }`}
                               >
                                 {child.name}
                               </Link>
