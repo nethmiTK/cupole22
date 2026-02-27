@@ -2,106 +2,142 @@
 
 import { useEffect, useState } from 'react';
 import AdminLayout from '../components/AdminLayout';
-import { Search, Filter, CheckCircle, XCircle, Clock, Trash2, User, Phone, MapPin, Eye } from 'lucide-react';
+import { Search, Filter, CheckCircle, XCircle, Eye, Trash2, Phone, User, AlertCircle } from 'lucide-react';
 import VendorDetailModal from '../components/VendorDetailModal';
 
-interface Proposal {
+interface ProposalVendor {
   _id: string;
-  adCode: string;
-  vendorId?: string;
-  privateInfo: {
-    firstName: string;
-    lastName: string;
-    whatsappContact: string;
-    address: string;
-  };
-  publicInfo: {
-    gender: string;
-    profession: string;
-    residentTown: string;
-    birthYear: number;
-  };
-  approvalStatus: string;
-  adStatus: string;
+  vendor_id: string;
+  name: string;
+  profilePic: string;
+  whatsappNo: string;
+  slipPhoto: string;
+  planName?: string;
+  planAmount?: number;
+  status: string;
   createdAt: string;
 }
 
+const BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').replace(/\/api$/, '');
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
+function getProfilePicUrl(pic: string | null | undefined): string | null {
+  if (!pic) return null;
+  if (pic.startsWith('http')) return pic;
+  return `${BASE_URL}${pic.startsWith('/') ? pic : '/' + pic}`;
+}
+
+function isOlderThan7Days(dateStr: string): boolean {
+  if (!dateStr) return false;
+  const created = new Date(dateStr);
+  const diffMs = Date.now() - created.getTime();
+  return diffMs > 7 * 24 * 60 * 60 * 1000;
+}
+
 export default function ProposalVendorsPage() {
-  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [vendors, setVendors] = useState<ProposalVendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-
-  // Modal state
-  const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
+  const [selectedVendor, setSelectedVendor] = useState<ProposalVendor | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+
+  // Pagination states
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
 
   useEffect(() => {
-    fetchProposals();
-  }, [statusFilter]);
+    setPage(1);
+    fetchVendors(1);
+  }, [statusFilter, searchTerm]);
 
-  const fetchProposals = async () => {
+  useEffect(() => {
+    fetchVendors(page);
+  }, [page]);
+
+  const fetchVendors = async (targetPage = page) => {
     try {
       setLoading(true);
-      const url = new URL(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/marriage-proposals/admin/all`);
+      const url = new URL(`${API_URL}/admin/proposal-vendors`);
       if (statusFilter !== 'all') url.searchParams.append('status', statusFilter);
+      if (searchTerm) url.searchParams.append('search', searchTerm);
+      url.searchParams.append('page', targetPage.toString());
+      url.searchParams.append('limit', limit.toString());
 
-      const res = await fetch(url.toString());
+      const token = localStorage.getItem('adminToken');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(url.toString(), { headers });
       if (res.ok) {
         const data = await res.json();
-        setProposals(data.proposals || []);
+        setVendors(data.vendors || []);
+        if (data.pagination) {
+          setTotalPages(data.pagination.pages);
+          setTotalRecords(data.pagination.total);
+        }
+      } else {
+        setVendors([]);
       }
-    } catch (err) {
-      console.error('Failed to fetch proposals:', err);
+    } catch {
+      setVendors([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const updateStatus = async (id: string, updates: any) => {
+  const toggleStatus = async (vendor: ProposalVendor) => {
+    const newStatus = vendor.status === 'active' ? 'pending' : 'active';
+    setActionLoadingId(vendor._id);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/marriage-proposals/update`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ proposalId: id, ...updates })
+      const token = localStorage.getItem('adminToken');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      await fetch(`${API_URL}/admin/proposal-vendors/${vendor._id}/status`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ status: newStatus }),
       });
-      if (res.ok) {
-        fetchProposals();
-      }
-    } catch (err) {
-      console.error('Failed to update proposal:', err);
+      fetchVendors();
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
-  const deleteProposal = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this proposal?')) return;
+  const deleteVendor = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this vendor? This cannot be undone.')) return;
+    setActionLoadingId(id);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/marriage-proposals/delete`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ proposalId: id })
-      });
+      const token = localStorage.getItem('adminToken');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`${API_URL}/admin/proposal-vendors/${id}`, { method: 'DELETE', headers });
       if (res.ok) {
-        fetchProposals();
+        setVendors(prev => prev.filter(v => v._id !== id));
+        fetchVendors();
+      } else {
+        alert('Failed to delete vendor');
       }
-    } catch (err) {
-      console.error('Failed to delete proposal:', err);
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
-  const filteredProposals = proposals.filter(p =>
-    p.adCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.privateInfo?.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.privateInfo?.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.privateInfo?.whatsappContact?.includes(searchTerm)
-  );
+  // We now use vendors directly as filtering is done on the server
+  const displayedVendors = vendors;
 
   return (
     <AdminLayout>
       <div className="space-y-6">
+        {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Marriage Proposals</h1>
-          <p className="text-gray-500 mt-1">Manage all wedding proposals and ads on the platform</p>
+          <h1 className="text-3xl font-bold text-gray-900">Proposal Vendors</h1>
+          <p className="text-gray-500 mt-1">Manage proposal service vendors · Rows older than 7 days are highlighted red</p>
         </div>
 
         {/* Filters */}
@@ -110,7 +146,7 @@ export default function ProposalVendorsPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
-              placeholder="Search by Ad Code, Name, or WhatsApp..."
+              placeholder="Search by name or WhatsApp..."
               className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500 transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -123,24 +159,27 @@ export default function ProposalVendorsPage() {
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
-              <option value="all">All Ad Status</option>
+              <option value="all">All Status</option>
               <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="draft">Draft</option>
+              <option value="pending">Pending</option>
+              <option value="rejected">Rejected</option>
             </select>
           </div>
         </div>
 
+        {/* Table */}
         <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left font-sans">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Proposal</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Requester (Private)</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Public Info</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Vendor</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">WhatsApp</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Joined</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Plan</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Slip</th>
                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -150,103 +189,219 @@ export default function ProposalVendorsPage() {
                       <td colSpan={5} className="px-6 py-4 h-16 bg-gray-50/50"></td>
                     </tr>
                   ))
-                ) : filteredProposals.length === 0 ? (
+                ) : displayedVendors.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
-                      No proposals found.
+                    <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                      No proposal vendors found.
                     </td>
                   </tr>
                 ) : (
-                  filteredProposals.map((proposal) => (
-                    <tr key={proposal._id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="font-mono text-sm font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded inline-block">
-                          {proposal.adCode}
-                        </div>
-                        <div className="text-xs text-gray-400 mt-1 italic">
-                          {new Date(proposal.createdAt).toLocaleDateString()}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        <div className="font-medium text-gray-900">{proposal.privateInfo.firstName} {proposal.privateInfo.lastName}</div>
-                        <div className="flex items-center gap-1 mt-1 text-xs">
-                          <Phone className="w-3 h-3" /> {proposal.privateInfo.whatsappContact}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        <div className="flex items-center gap-1 font-medium text-gray-800">
-                          <User className="w-4 h-4 text-gray-400" /> {proposal.publicInfo.gender} ({new Date().getFullYear() - proposal.publicInfo.birthYear})
-                        </div>
-                        <div className="text-xs text-gray-500 mt-0.5">{proposal.publicInfo.profession}</div>
-                        <div className="flex items-center gap-1 mt-1 text-xs text-gray-400">
-                          <MapPin className="w-3 h-3" /> {proposal.publicInfo.residentTown}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="space-y-1">
-                          <div className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${proposal.adStatus === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
-                            }`}>
-                            Ad: {proposal.adStatus}
+                  displayedVendors.map((vendor: ProposalVendor) => {
+                    const expired = isOlderThan7Days(vendor.createdAt);
+                    const picUrl = getProfilePicUrl(vendor.profilePic);
+                    const isActive = vendor.status === 'active';
+                    const isLoading = actionLoadingId === vendor._id;
+
+                    return (
+                      <tr
+                        key={vendor._id}
+                        className={`transition-colors ${expired && vendor.status !== 'active'
+                          ? 'bg-red-50 border-l-4 border-red-500 hover:bg-red-100'
+                          : 'hover:bg-gray-50'
+                          }`}
+                      >
+                        {/* Vendor col with profile pic */}
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            {picUrl ? (
+                              <img
+                                src={picUrl}
+                                alt={vendor.name}
+                                className="w-10 h-10 rounded-full object-cover border-2 border-rose-100 shadow-sm"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <div className="w-10 h-10 bg-gradient-to-br from-rose-100 to-rose-200 rounded-full flex items-center justify-center shadow-sm">
+                                <User className="w-5 h-5 text-rose-500" />
+                              </div>
+                            )}
+                            <div>
+                              <div className="font-semibold text-gray-900 text-sm">{vendor.name || '—'}</div>
+                              {expired && vendor.status !== 'active' && (
+                                <div className="flex items-center gap-1 text-red-600 text-[10px] font-bold uppercase tracking-wide mt-0.5">
+                                  <AlertCircle className="w-3 h-3" /> Payment Overdue
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          <br />
-                          <div className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${proposal.approvalStatus === 'approved' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
-                            }`}>
-                            Appr: {proposal.approvalStatus}
+                        </td>
+
+                        {/* WhatsApp */}
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          <div className="flex items-center gap-1.5">
+                            <Phone className="w-3.5 h-3.5 text-gray-400" />
+                            {vendor.whatsappNo || '—'}
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-2">
-                          <button
-                            onClick={() => {
-                              setSelectedProposal(proposal);
-                              setIsModalOpen(true);
-                            }}
-                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors border border-rose-100"
-                            title="View Full Details & Subscription"
-                          >
-                            <Eye className="w-5 h-5" />
-                          </button>
-                          {proposal.adStatus !== 'active' ? (
-                            <button
-                              onClick={() => updateStatus(proposal._id, { adStatus: 'active' })}
-                              className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors border border-green-100"
-                              title="Activate Ad"
+                        </td>
+
+                        {/* Joined date */}
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          {vendor.createdAt ? new Date(vendor.createdAt).toLocaleDateString() : '—'}
+                        </td>
+
+                        {/* Plan */}
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold text-gray-900">{vendor.planName || 'No Plan'}</span>
+                            {vendor.planAmount && <span className="text-[10px] text-gray-400">LKR {vendor.planAmount.toLocaleString()}</span>}
+                          </div>
+                        </td>
+
+                        {/* Slip Photo Thumbnail */}
+                        <td className="px-6 py-4 text-center">
+                          {vendor.slipPhoto ? (
+                            <a
+                              href={getProfilePicUrl(vendor.slipPhoto) || '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-block relative group"
                             >
-                              <CheckCircle className="w-5 h-5" />
-                            </button>
+                              <div className="relative">
+                                <img
+                                  src={getProfilePicUrl(vendor.slipPhoto) || ''}
+                                  alt="Slip"
+                                  className="w-12 h-16 object-cover rounded shadow-sm border border-gray-100 group-hover:scale-110 transition-transform"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.src = 'https://placehold.co/48x64/rose/white?text=ERR';
+                                  }}
+                                />
+                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-rose-600/20 rounded">
+                                  <Eye className="w-4 h-4 text-white drop-shadow-md" />
+                                </div>
+                              </div>
+                            </a>
                           ) : (
-                            <button
-                              onClick={() => updateStatus(proposal._id, { adStatus: 'inactive' })}
-                              className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors border border-amber-100"
-                              title="Pause Ad"
-                            >
-                              <XCircle className="w-5 h-5" />
-                            </button>
+                            <span className="text-gray-300 text-[10px] font-bold uppercase tracking-widest italic">No Slip</span>
                           )}
-                          <button
-                            onClick={() => deleteProposal(proposal._id)}
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-100"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+
+                        {/* Status badge */}
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${isActive
+                            ? 'bg-green-100 text-green-700'
+                            : vendor.status === 'pending'
+                              ? 'bg-amber-100 text-amber-700'
+                              : 'bg-red-100 text-red-700'
+                            }`}>
+                            {isActive ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                            {vendor.status ? vendor.status.charAt(0).toUpperCase() + vendor.status.slice(1) : 'Unknown'}
+                          </span>
+                        </td>
+
+                        {/* Action icons: Delete | View */}
+                        <td className="px-6 py-4">
+                          <div className="flex items-center justify-center gap-2">
+                            {/* Quick Activate (for pending with slip) */}
+                            {!isActive && vendor.slipPhoto && (
+                              <button
+                                disabled={isLoading}
+                                onClick={() => toggleStatus(vendor)}
+                                title="Quick Activate"
+                                className="p-2 text-green-600 hover:bg-green-50 bg-green-50/30 rounded-lg transition-colors disabled:opacity-50"
+                              >
+                                {isLoading ? (
+                                  <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+                                ) : (
+                                  <CheckCircle className="w-4 h-4" />
+                                )}
+                              </button>
+                            )}
+
+                            {/* Delete */}
+                            <button
+                              disabled={isLoading}
+                              onClick={() => deleteVendor(vendor._id)}
+                              title="Delete Vendor"
+                              className="p-2 text-red-500 hover:bg-red-50 bg-red-50/30 rounded-lg transition-colors disabled:opacity-50"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+
+                            {/* View */}
+                            <button
+                              onClick={() => {
+                                setSelectedVendor(vendor);
+                                setIsModalOpen(true);
+                              }}
+                              title="View Details"
+                              className="p-2 text-blue-600 hover:bg-blue-50 bg-blue-50/30 rounded-lg transition-colors"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
           </div>
         </div>
 
-        {selectedProposal && (
+        {/* Pagination UI */}
+        {totalPages > 1 && (
+          <div className="flex flex-col md:flex-row items-center justify-between bg-white px-6 py-4 rounded-xl shadow-sm border border-gray-100 gap-4 mt-4">
+            <div className="text-sm text-gray-500 order-2 md:order-1">
+              Showing <span className="font-semibold text-gray-900">{(page - 1) * limit + 1}</span> to <span className="font-semibold text-gray-900">{Math.min(page * limit, totalRecords)}</span> of <span className="font-semibold text-gray-900">{totalRecords}</span> vendors
+            </div>
+            <div className="flex items-center gap-2 order-1 md:order-2">
+              <button
+                disabled={page === 1 || loading}
+                onClick={() => setPage(prev => Math.max(1, prev - 1))}
+                className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Previous
+              </button>
+              <div className="flex items-center gap-1 overflow-x-auto max-w-[200px] md:max-w-none pb-1 md:pb-0">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setPage(p)}
+                    className={`w-10 h-10 flex-shrink-0 rounded-lg text-sm font-medium transition-colors ${p === page
+                      ? 'bg-rose-500 text-white shadow-md'
+                      : 'text-gray-600 hover:bg-gray-50 border border-transparent hover:border-gray-200'}`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+              <button
+                disabled={page === totalPages || loading}
+                onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
+                className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Modal */}
+        {selectedVendor && (
           <VendorDetailModal
             isOpen={isModalOpen}
-            onClose={() => setIsModalOpen(false)}
-            vendorId={selectedProposal.vendorId || selectedProposal._id}
-            vendorName={`${selectedProposal.privateInfo.firstName} ${selectedProposal.privateInfo.lastName}`}
+            onClose={() => {
+              setIsModalOpen(false);
+              setSelectedVendor(null);
+            }}
+            onRefresh={fetchVendors}
+            vendorId={selectedVendor.vendor_id || selectedVendor._id}
+            vendorName={selectedVendor.name}
+            vendorProfilePic={getProfilePicUrl(selectedVendor.profilePic)}
             vendorType="proposal"
           />
         )}
@@ -254,4 +409,3 @@ export default function ProposalVendorsPage() {
     </AdminLayout>
   );
 }
-

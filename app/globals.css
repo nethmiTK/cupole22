@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Fix for share-modal.js error */
+#share-modal { display: none; }
+
 :root {
   --page-bg: #FFF1F3;
   --card-bg: #FFFFFF;

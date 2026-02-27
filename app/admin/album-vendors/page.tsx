@@ -2,80 +2,129 @@
 
 import { useEffect, useState } from 'react';
 import AdminLayout from '../components/AdminLayout';
-import { Search, Filter, Mail, Phone, MapPin, CheckCircle, XCircle, Clock, Trash2, Eye } from 'lucide-react';
+import { Search, Filter, Phone, CheckCircle, XCircle, Trash2, Eye, User, AlertCircle } from 'lucide-react';
 import VendorDetailModal from '../components/VendorDetailModal';
 
-interface Vendor {
+interface AlbumVendor {
   _id: string;
+  vendor_id?: string;
   name: string;
-  email: string;
+  email?: string;
   whatsappNo: string;
-  city: string;
-  status: 'active' | 'inactive' | 'pending';
+  city?: string;
+  profilePic?: string;
+  slipPhoto?: string;
+  status: string;
   createdAt: string;
 }
 
+const BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').replace(/\/api$/, '');
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
+function getProfilePicUrl(pic: string | null | undefined): string | null {
+  if (!pic) return null;
+  if (pic.startsWith('http')) return pic;
+  return `${BASE_URL}${pic.startsWith('/') ? pic : '/' + pic}`;
+}
+
+function isOlderThan7Days(dateStr: string): boolean {
+  if (!dateStr) return false;
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  return diffMs > 7 * 24 * 60 * 60 * 1000;
+}
+
 export default function AlbumVendorsPage() {
-  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [vendors, setVendors] = useState<AlbumVendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-
-  // Modal state
-  const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
+  const [selectedVendor, setSelectedVendor] = useState<AlbumVendor | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+
+  // Pagination states
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
 
   useEffect(() => {
-    fetchVendors();
-  }, [statusFilter]);
+    setPage(1);
+    fetchVendors(1);
+  }, [statusFilter, searchTerm]);
 
-  const fetchVendors = async () => {
+  useEffect(() => {
+    fetchVendors(page);
+  }, [page]);
+
+  const fetchVendors = async (targetPage = page) => {
     try {
       setLoading(true);
-      const url = new URL(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/album-vendors`);
+      const url = new URL(`${API_URL}/album-vendors`);
       if (statusFilter !== 'all') url.searchParams.append('status', statusFilter);
+      if (searchTerm) url.searchParams.append('search', searchTerm);
+      url.searchParams.append('page', targetPage.toString());
+      url.searchParams.append('limit', limit.toString());
 
       const res = await fetch(url.toString());
       if (res.ok) {
         const data = await res.json();
         setVendors(data.vendors || []);
+        if (data.pagination) {
+          setTotalPages(data.pagination.pages);
+          setTotalRecords(data.pagination.total);
+        }
+      } else {
+        setVendors([]);
       }
-    } catch (err) {
-      console.error('Failed to fetch album vendors:', err);
+    } catch {
+      setVendors([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const updateStatus = async (id: string, status: string) => {
+  const toggleStatus = async (vendor: AlbumVendor) => {
+    const newStatus = vendor.status === 'active' ? 'inactive' : 'active';
+    setActionLoadingId(vendor._id);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/album-vendors/${id}/status`, {
+      await fetch(`${API_URL}/album-vendors/${vendor._id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
+        body: JSON.stringify({ status: newStatus }),
       });
-      if (res.ok) {
-        fetchVendors();
-      }
-    } catch (err) {
-      console.error('Failed to update vendor status:', err);
+      fetchVendors();
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
-  const filteredVendors = vendors.filter(v =>
-    v.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    v.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    v.whatsappNo?.includes(searchTerm)
-  );
+  const deleteVendor = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this vendor? This cannot be undone.')) return;
+    setActionLoadingId(id);
+    try {
+      const res = await fetch(`${API_URL}/album-vendors/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setVendors(prev => prev.filter(v => v._id !== id));
+        fetchVendors();
+      } else {
+        alert('Failed to delete vendor');
+      }
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  // Filtering is now done on the server
+  const displayedVendors = vendors;
 
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Album Vendors</h1>
-            <p className="text-gray-500 mt-1">Manage and monitor all album platform vendors</p>
-          </div>
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Album Vendors</h1>
+          <p className="text-gray-500 mt-1">Manage album vendors · Rows older than 7 days without activation are highlighted red</p>
         </div>
 
         {/* Filters */}
@@ -105,17 +154,18 @@ export default function AlbumVendorsPage() {
           </div>
         </div>
 
-        {/* Vendors Table */}
+        {/* Table */}
         <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
+            <table className="w-full text-left font-sans">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Vendor Info</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Contact</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Location</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Vendor</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">WhatsApp</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Joined</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Slip</th>
                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -125,100 +175,205 @@ export default function AlbumVendorsPage() {
                       <td colSpan={5} className="px-6 py-4 h-16 bg-gray-50/50"></td>
                     </tr>
                   ))
-                ) : filteredVendors.length === 0 ? (
+                ) : displayedVendors.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
-                      No vendors found matching your criteria.
+                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                      No album vendors found.
                     </td>
                   </tr>
                 ) : (
-                  filteredVendors.map((vendor) => (
-                    <tr key={vendor._id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="font-semibold text-gray-900">{vendor.name}</div>
-                        <div className="text-xs text-gray-400 mt-0.5">Joined {new Date(vendor.createdAt).toLocaleDateString()}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <Mail className="w-4 h-4 text-gray-400" />
-                            {vendor.email}
+                  displayedVendors.map((vendor: AlbumVendor) => {
+                    const expired = isOlderThan7Days(vendor.createdAt);
+                    const picUrl = getProfilePicUrl(vendor.profilePic);
+                    const isActive = vendor.status === 'active';
+                    const isLoading = actionLoadingId === vendor._id;
+
+                    return (
+                      <tr
+                        key={vendor._id}
+                        className={`transition-colors ${expired && !isActive
+                          ? 'bg-red-50 border-l-4 border-red-500 hover:bg-red-100'
+                          : 'hover:bg-gray-50'
+                          }`}
+                      >
+                        {/* Vendor col with profile pic */}
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            {picUrl ? (
+                              <img
+                                src={picUrl}
+                                alt={vendor.name}
+                                className="w-10 h-10 rounded-full object-cover border-2 border-rose-100 shadow-sm"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <div className="w-10 h-10 bg-gradient-to-br from-rose-100 to-rose-200 rounded-full flex items-center justify-center shadow-sm">
+                                <User className="w-5 h-5 text-rose-500" />
+                              </div>
+                            )}
+                            <div>
+                              <div className="font-semibold text-gray-900 text-sm">{vendor.name || '—'}</div>
+                              {vendor.email && (
+                                <div className="text-xs text-gray-400 mt-0.5">{vendor.email}</div>
+                              )}
+                              {expired && !isActive && (
+                                <div className="flex items-center gap-1 text-red-600 text-[10px] font-bold uppercase tracking-wide mt-0.5">
+                                  <AlertCircle className="w-3 h-3" /> Payment Overdue
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <Phone className="w-4 h-4 text-gray-400" />
-                            {vendor.whatsappNo}
+                        </td>
+
+                        {/* WhatsApp */}
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          <div className="flex items-center gap-1.5">
+                            <Phone className="w-3.5 h-3.5 text-gray-400" />
+                            {vendor.whatsappNo || '—'}
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <MapPin className="w-4 h-4 text-gray-400" />
-                          {vendor.city || 'Not specified'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${vendor.status === 'active' ? 'bg-green-100 text-green-700' :
-                          vendor.status === 'pending' ? 'bg-amber-100 text-amber-700' :
-                            'bg-red-100 text-red-700'
-                          }`}>
-                          {vendor.status === 'active' ? <CheckCircle className="w-3 h-3" /> :
-                            vendor.status === 'pending' ? <Clock className="w-3 h-3" /> :
-                              <XCircle className="w-3 h-3" />}
-                          {vendor.status.charAt(0).toUpperCase() + vendor.status.slice(1)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-2">
-                          <button
-                            onClick={() => {
-                              setSelectedVendor(vendor);
-                              setIsModalOpen(true);
-                            }}
-                            className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                            title="View Details & Subscription"
-                          >
-                            <Eye className="w-5 h-5" />
-                          </button>
-                          {vendor.status !== 'active' && (
-                            <button
-                              onClick={() => updateStatus(vendor._id, 'active')}
-                              className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                              title="Approve / Activate"
+                        </td>
+
+                        {/* Joined date */}
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          {vendor.createdAt ? new Date(vendor.createdAt).toLocaleDateString() : '—'}
+                        </td>
+
+                        {/* Slip Photo Thumbnail */}
+                        <td className="px-6 py-4 text-center">
+                          {vendor.slipPhoto ? (
+                            <a
+                              href={getProfilePicUrl(vendor.slipPhoto) || '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-block relative group"
                             >
-                              <CheckCircle className="w-5 h-5" />
-                            </button>
+                              <img
+                                src={getProfilePicUrl(vendor.slipPhoto) || ''}
+                                alt="Slip"
+                                className="w-12 h-16 object-cover rounded shadow-sm border border-gray-100 group-hover:scale-110 transition-transform"
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                              />
+                            </a>
+                          ) : (
+                            <span className="text-gray-300 text-[10px] font-bold uppercase tracking-widest italic">No Slip</span>
                           )}
-                          {vendor.status === 'active' && (
+                        </td>
+
+                        {/* Status badge */}
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${isActive
+                            ? 'bg-green-100 text-green-700'
+                            : vendor.status === 'pending'
+                              ? 'bg-amber-100 text-amber-700'
+                              : 'bg-red-100 text-red-700'
+                            }`}>
+                            {isActive ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                            {vendor.status ? vendor.status.charAt(0).toUpperCase() + vendor.status.slice(1) : 'Unknown'}
+                          </span>
+                        </td>
+
+                        {/* 3 action icons: Active toggle | Delete | View */}
+                        <td className="px-6 py-4">
+                          <div className="flex items-center justify-center gap-2">
+                            {/* Quick Activate (for pending with slip) */}
+                            {!isActive && vendor.slipPhoto && (
+                              <button
+                                disabled={isLoading}
+                                onClick={() => toggleStatus(vendor)}
+                                title="Quick Activate"
+                                className="p-2 text-green-600 hover:bg-green-50 bg-green-50/30 rounded-lg transition-colors disabled:opacity-50"
+                              >
+                                {isLoading ? (
+                                  <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+                                ) : (
+                                  <CheckCircle className="w-4 h-4" />
+                                )}
+                              </button>
+                            )}
+                            {/* Delete */}
                             <button
-                              onClick={() => updateStatus(vendor._id, 'inactive')}
-                              className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                              title="Pause Account"
+                              disabled={isLoading}
+                              onClick={() => deleteVendor(vendor._id)}
+                              title="Delete Vendor"
+                              className="p-2 text-red-500 hover:bg-red-50 bg-red-50/30 rounded-lg transition-colors disabled:opacity-50"
                             >
-                              <XCircle className="w-5 h-5" />
+                              <Trash2 className="w-4 h-4" />
                             </button>
-                          )}
-                          <button
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+
+                            {/* View */}
+                            <button
+                              onClick={() => {
+                                setSelectedVendor(vendor);
+                                setIsModalOpen(true);
+                              }}
+                              title="View Details"
+                              className="p-2 text-blue-600 hover:bg-blue-50 bg-blue-50/30 rounded-lg transition-colors"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
           </div>
         </div>
 
+        {/* Pagination UI */}
+        {totalPages > 1 && (
+          <div className="flex flex-col md:flex-row items-center justify-between bg-white px-6 py-4 rounded-xl shadow-sm border border-gray-100 gap-4 mt-4">
+            <div className="text-sm text-gray-500 order-2 md:order-1">
+              Showing <span className="font-semibold text-gray-900">{(page - 1) * limit + 1}</span> to <span className="font-semibold text-gray-900">{Math.min(page * limit, totalRecords)}</span> of <span className="font-semibold text-gray-900">{totalRecords}</span> vendors
+            </div>
+            <div className="flex items-center gap-2 order-1 md:order-2">
+              <button
+                disabled={page === 1 || loading}
+                onClick={() => setPage(prev => Math.max(1, prev - 1))}
+                className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Previous
+              </button>
+              <div className="flex items-center gap-1 overflow-x-auto max-w-[200px] md:max-w-none pb-1 md:pb-0">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setPage(p)}
+                    className={`w-10 h-10 flex-shrink-0 rounded-lg text-sm font-medium transition-colors ${p === page
+                      ? 'bg-rose-500 text-white shadow-md'
+                      : 'text-gray-600 hover:bg-gray-50 border border-transparent hover:border-gray-200'}`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+              <button
+                disabled={page === totalPages || loading}
+                onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
+                className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Modal */}
         {selectedVendor && (
           <VendorDetailModal
             isOpen={isModalOpen}
-            onClose={() => setIsModalOpen(false)}
-            vendorId={selectedVendor._id}
+            onClose={() => {
+              setIsModalOpen(false);
+              setSelectedVendor(null);
+            }}
+            onRefresh={fetchVendors}
+            vendorId={selectedVendor.vendor_id || selectedVendor._id}
             vendorName={selectedVendor.name}
+            vendorProfilePic={getProfilePicUrl(selectedVendor.profilePic)}
             vendorType="album"
           />
         )}
@@ -226,4 +381,3 @@ export default function AlbumVendorsPage() {
     </AdminLayout>
   );
 }
-
