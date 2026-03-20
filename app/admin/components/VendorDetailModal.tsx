@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, CheckCircle, XCircle, Clock, CreditCard, Mail, Phone, MapPin, ExternalLink, Calendar, Package, User } from 'lucide-react';
 
-const BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').replace(/\/api$/, '');
+const BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
 
 interface VendorDetailModalProps {
     isOpen: boolean;

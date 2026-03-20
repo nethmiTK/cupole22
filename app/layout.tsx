@@ -7,9 +7,12 @@ export const metadata: Metadata = {
   title: 'CoupleCanvas Admin',
   description: 'Confidential Administration Panel',
   icons: {
-    icon: '/images/logos.png',
-    shortcut: '/images/logos.png',
-    apple: '/images/logos.png',
+    icon: [
+      { url: '/logos.png' },
+      { url: '/favicon.png' },
+    ],
+    shortcut: '/logos.png',
+    apple: '/logos.png',
   },
 };
 

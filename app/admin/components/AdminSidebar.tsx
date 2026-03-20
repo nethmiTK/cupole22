@@ -94,7 +94,7 @@ export default function AdminSidebar({ isOpen = true, onClose }: AdminSidebarPro
           </button>
         </div>
         <div className="p-4 lg:p-7 border-b border-gray-100 flex flex-col items-center">
-          <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight text-rose-700 mb-1">CoupleCanvas</h1>
+          <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight text-rose-700 mb-1">Memo Album</h1>
           <p className="text-rose-400 text-sm lg:text-base font-medium">Admin Panel</p>
         </div>
 

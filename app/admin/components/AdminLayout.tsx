@@ -46,17 +46,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         {/* Top Header */}
         <header className="bg-rose-50 shadow-sm border-b border-rose-100 px-4 lg:px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className="lg:hidden p-2 text-rose-600 hover:text-rose-800 transition-colors"
-              >
-                <Menu className="w-6 h-6" />
-              </button>
-              <h2 className="text-lg lg:text-xl font-semibold text-rose-700">
-                Welcome back, <span className="text-rose-800">{admin?.name || 'Admin'}</span>
-              </h2>
-            </div>
+             
             <div className="flex items-center gap-2 lg:gap-4">
               <button className="relative p-2 text-rose-600 hover:text-rose-800 transition-colors">
                 <span className="text-lg lg:text-xl">🔔</span>
@@ -64,17 +54,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                   3
                 </span>
               </button>
-              <div className="flex items-center gap-2 lg:gap-3">
-                <div className="w-8 h-8 lg:w-10 lg:h-10 bg-rose-100 rounded-full flex items-center justify-center">
-                  <span className="text-rose-600 font-semibold text-sm lg:text-base">
-                    {admin?.name?.charAt(0).toUpperCase() || 'A'}
-                  </span>
-                </div>
-                <div className="hidden sm:block">
-                  <p className="text-sm font-medium text-rose-800">{admin?.name}</p>
-                  <p className="text-xs text-rose-600">{admin?.email}</p>
-                </div>
-              </div>
+            
             </div>
           </div>
         </header>

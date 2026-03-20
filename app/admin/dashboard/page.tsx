@@ -4,6 +4,12 @@ import { useEffect, useState } from 'react';
 import AdminLayout from '../components/AdminLayout';
 import { Users, Camera, Heart, CheckCircle, Clock, BarChart3, ArrowUpRight, ShieldCheck, Activity, Mail, MessageSquare } from 'lucide-react';
 
+const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+const API_BASE_URL = rawApiUrl.endsWith('/api')
+  ? rawApiUrl
+  : `${rawApiUrl.replace(/\/$/, '')}/api`;
+const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, '');
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -18,7 +24,7 @@ export default function AdminDashboard() {
   const fetchStats = async (token: string) => {
     try {
       setLoading(true);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/stats`, {
+      const res = await fetch(`${API_BASE_URL}/stats`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -69,9 +75,6 @@ export default function AdminDashboard() {
         {/* Top Header Section */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-100 text-rose-600 text-[10px] font-black uppercase tracking-wider">
-              <ShieldCheck className="w-3 h-3" /> Secure Administrator Hub
-            </div>
             <h1 className="text-4xl font-black text-gray-900 tracking-tight">Platform <span className="text-rose-600">Overview</span></h1>
             <p className="text-gray-500 font-medium">Monitoring Album & Marriage Proposal ecosystems.</p>
           </div>
@@ -83,7 +86,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Tier 1: Platform Summary */}
+        {/*  Platform Summary */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {mainSummary.map((item, index) => (
             <div key={index} className="group relative bg-white rounded-[2.5rem] p-1 shadow-xl shadow-rose-100/20 border border-rose-50 transition-all hover:translate-y-[-4px]">
@@ -127,7 +130,7 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-        {/* Tier 2: Key Metrics Cards */}
+        {/*  Key Metrics Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {[
             { label: 'Platform Profit', value: stats?.totalRevenue ? `LKR ${stats.totalRevenue.toLocaleString()}` : 'LKR 0', icon: <Activity />, color: 'from-emerald-500 to-teal-600', sub: 'Total Accumulated Revenue' },
@@ -148,9 +151,9 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-        {/* Tier 3: Real-time Data */}
+        {/*  Real-time Data */}
         <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
-          {/* Revenue Growth Summary */}
+        
           <div className="xl:col-span-2 bg-white rounded-[2.5rem] p-8 border border-rose-100 shadow-xl overflow-hidden relative">
             <div className="flex items-center justify-between mb-8">
               <div>
@@ -200,7 +203,7 @@ export default function AdminDashboard() {
             <div className="space-y-4 flex-1 overflow-y-auto max-h-[400px] pr-2 custom-scrollbar">
               {stats?.recentSubscriptions && stats.recentSubscriptions.length > 0 ? (
                 stats.recentSubscriptions.map((sub: any, i: number) => {
-                  const picUrl = sub.vendorProfilePic ? (sub.vendorProfilePic.startsWith('http') ? sub.vendorProfilePic : `http://localhost:4000${sub.vendorProfilePic.startsWith('/') ? '' : '/'}${sub.vendorProfilePic}`) : null;
+                  const picUrl = sub.vendorProfilePic ? (sub.vendorProfilePic.startsWith('http') ? sub.vendorProfilePic : `${API_ORIGIN}${sub.vendorProfilePic.startsWith('/') ? '' : '/'}${sub.vendorProfilePic}`) : null;
 
                   return (
                     <div key={i} className="flex items-center gap-4 group cursor-pointer border-b border-gray-50 pb-3 last:border-0 hover:bg-rose-50/30 p-2 rounded-2xl transition-all">

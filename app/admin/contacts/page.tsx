@@ -16,7 +16,7 @@ interface ContactMessage {
     created_at: string;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 export default function ContactsPage() {
     const [messages, setMessages] = useState<ContactMessage[]>([]);
