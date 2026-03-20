@@ -3,12 +3,22 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { 
+  X, 
+  LayoutDashboard, 
+  Users, 
+  Image, 
+  MessageSquare, 
+  LogOut,
+  ChevronRight,
+  Sparkles
+} from 'lucide-react';
 
 
 interface MenuItem {
   name: string;
   href?: string;
+  icon: any;
   children?: { name: string; href: string }[];
 }
 
@@ -16,18 +26,22 @@ const menuItems: MenuItem[] = [
   {
     name: 'Dashboard',
     href: '/admin/dashboard',
+    icon: LayoutDashboard,
   },
   {
     name: 'Proposal Vendor',
     href: '/admin/proposal-vendors',
+    icon: Users,
   },
   {
     name: 'Album Vendor',
     href: '/admin/album-vendors',
+    icon: Image,
   },
   {
     name: 'Contacts',
     href: '/admin/contacts',
+    icon: MessageSquare,
   },
 ];
 
@@ -82,69 +96,85 @@ export default function AdminSidebar({ isOpen = true, onClose }: AdminSidebarPro
       )}
 
       {/* Sidebar */}
-      <aside className={`w-64 h-screen fixed top-0 left-0 bg-gradient-to-b from-white via-gray-50 to-white text-gray-900 flex flex-col shadow-2xl border-r border-gray-100 z-50 overflow-y-auto transition-transform duration-300 lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
+      <aside className={`w-72 h-screen fixed top-0 left-0 bg-white text-gray-900 flex flex-col shadow-2xl border-r border-rose-100 z-50 overflow-hidden transition-transform duration-300 lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}>
         {/* Mobile Close Button */}
         <div className="lg:hidden flex justify-end p-4">
           <button
             onClick={onClose}
-            className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
+            className="p-2 text-rose-400 hover:text-rose-600 transition-colors"
           >
             <X className="w-6 h-6" />
           </button>
         </div>
-        <div className="p-4 lg:p-7 border-b border-gray-100 flex flex-col items-center">
-          <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight text-rose-700 mb-1">Memo Album</h1>
-          <p className="text-rose-400 text-sm lg:text-base font-medium">Admin Panel</p>
+
+        {/* Brand Header */}
+        <div className="p-8 border-b border-rose-50 flex flex-col items-center bg-rose-50/30">
+          <div className="w-16 h-16 bg-gradient-to-tr from-rose-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg shadow-rose-200 mb-4 transform hover:scale-105 transition-transform duration-300">
+             <Sparkles className="text-white w-8 h-8" />
+          </div>
+          <h1 className="text-2xl font-black tracking-tight text-gray-800 flex items-center gap-1">
+            Memo <span className="text-rose-600">Album</span>
+          </h1>
+          <p className="text-rose-400 text-xs font-bold uppercase tracking-widest mt-1">Management Portal</p>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 py-6 overflow-y-auto">
-          <ul className="space-y-2 px-4">
+        <nav className="flex-1 py-8 overflow-y-auto px-6 custom-scrollbar">
+          <div className="mb-4 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">
+            General Menu
+          </div>
+          <ul className="space-y-3">
             {menuItems.map((item) => {
+              const Icon = item.icon;
               const parentActive = isParentActive(item.children) || openMenus.includes(item.name);
+              const active = isActive(item.href || '');
+
               return (
                 <li key={item.name}>
                   {item.href ? (
                     <Link
                       href={item.href}
                       onClick={() => onClose?.()}
-                      className={`flex items-center px-4 lg:px-5 py-3 rounded-xl transition-all duration-200 border border-transparent text-sm lg:text-lg ${isActive(item.href)
-                        ? 'bg-rose-600 text-white font-bold border-rose-700 shadow-md'
-                        : 'hover:bg-rose-100 hover:text-rose-700 text-gray-700'
+                      className={`group flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all duration-300 border ${active
+                        ? 'bg-gradient-to-r from-rose-600 to-pink-500 text-white border-rose-400 shadow-lg shadow-rose-200 ring-4 ring-rose-50/50'
+                        : 'bg-white border-transparent text-gray-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100'
                         }`}
                     >
-                      <span className="font-semibold">{item.name}</span>
+                      <Icon className={`w-5 h-5 transition-transform duration-300 ${active ? 'scale-110' : 'group-hover:scale-110'}`} />
+                      <span className="font-bold text-sm tracking-wide">{item.name}</span>
+                      {active && <div className="ml-auto w-1.5 h-1.5 bg-white rounded-full animate-pulse" />}
                     </Link>
                   ) : (
                     <>
                       <button
                         onClick={() => toggleMenu(item.name)}
-                        className={`w-full flex items-center justify-between px-5 py-3 rounded-xl transition-all duration-200 border border-transparent ${parentActive
-                          ? 'bg-rose-600 text-white font-bold border-rose-700 shadow-md'
-                          : 'hover:bg-rose-100 hover:text-rose-700 text-gray-700'
+                        className={`w-full flex items-center justify-between px-4 py-3.5 rounded-2xl transition-all duration-300 border ${parentActive
+                          ? 'bg-rose-50 text-rose-700 border-rose-100'
+                          : 'bg-white border-transparent text-gray-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100'
                           }`}
                       >
-                        <span className="font-semibold text-lg">{item.name}</span>
-                        <span
-                          className={`transition-transform duration-300 text-base ml-2 ${openMenus.includes(item.name) ? 'rotate-180' : ''
+                        <div className="flex items-center gap-4">
+                          <Icon className={`w-5 h-5 ${parentActive ? 'text-rose-600' : ''}`} />
+                          <span className="font-bold text-sm tracking-wide">{item.name}</span>
+                        </div>
+                        <ChevronRight
+                          className={`w-4 h-4 transition-transform duration-300 ${openMenus.includes(item.name) ? 'rotate-90' : ''
                             }`}
-                        >
-                          ▼
-                        </span>
+                        />
                       </button>
                       <div
-                        className={`transition-all duration-300 overflow-hidden ${openMenus.includes(item.name) ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}
+                        className={`transition-all duration-300 overflow-hidden ${openMenus.includes(item.name) ? 'max-h-[500px] opacity-100 mt-2' : 'max-h-0 opacity-0'}`}
                       >
                         {item.children && (
-                          <ul className="mt-2 space-y-1 pl-2">
+                          <ul className="space-y-1 ml-9 border-l-2 border-rose-100 pl-4 py-2">
                             {item.children.map((child) => (
                               <li key={child.href}>
                                 <Link
                                   href={child.href}
-                                  className={`block px-4 py-2 rounded-lg text-base transition-all duration-200 border border-transparent ${isActive(child.href)
-                                    ? 'bg-rose-100 text-rose-700 font-semibold border-rose-200 shadow'
-                                    : 'hover:bg-rose-50 hover:text-rose-700 text-gray-700'
+                                  className={`block px-4 py-2.5 rounded-xl text-sm transition-all duration-200 ${isActive(child.href)
+                                    ? 'text-rose-600 font-bold bg-rose-50 ring-1 ring-rose-100'
+                                    : 'text-gray-500 hover:text-rose-600 hover:bg-rose-50/50'
                                     }`}
                                 >
                                   {child.name}
@@ -162,14 +192,20 @@ export default function AdminSidebar({ isOpen = true, onClose }: AdminSidebarPro
           </ul>
         </nav>
 
-        {/* Logout */}
-        <div className="p-4 lg:p-5 border-t border-gray-100">
+        {/* Logout Section */}
+        <div className="p-6 border-t border-rose-50 bg-rose-50/20">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 px-4 lg:px-5 py-3 bg-gradient-to-r from-rose-100 to-rose-200 hover:from-rose-200 hover:to-rose-300 rounded-xl transition-all duration-200 text-rose-700 hover:text-rose-900 font-bold shadow text-sm lg:text-base"
+            className="w-full flex items-center justify-center gap-3 px-4 py-4 bg-white border-2 border-rose-100 hover:bg-rose-600 hover:border-rose-600 hover:text-white rounded-2xl transition-all duration-300 text-rose-600 font-black text-sm shadow-sm hover:shadow-xl hover:shadow-rose-100 group"
           >
-            <span>Logout</span>
+            <LogOut className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
+            <span>SIGN OUT</span>
           </button>
+          
+          <div className="mt-4 flex justify-center items-center gap-2">
+             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+             <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">System Online</span>
+          </div>
         </div>
       </aside>
     </>

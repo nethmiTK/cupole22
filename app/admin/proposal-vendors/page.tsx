@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import AdminLayout from '../components/AdminLayout';
 import { Search, Filter, CheckCircle, XCircle, Eye, Trash2, Phone, User, AlertCircle } from 'lucide-react';
-import VendorDetailModal from '../components/VendorDetailModal';
+import ProposalVendorQuickViewModal from '../components/ProposalVendorQuickViewModal';
 
 interface ProposalVendor {
   _id: string;
@@ -392,14 +392,14 @@ export default function ProposalVendorsPage() {
 
         {/* Modal */}
         {selectedVendor && (
-          <VendorDetailModal
+          <ProposalVendorQuickViewModal
             isOpen={isModalOpen}
             onClose={() => {
               setIsModalOpen(false);
               setSelectedVendor(null);
             }}
-            onRefresh={fetchVendors}
             vendorId={selectedVendor.vendor_id || selectedVendor._id}
+            fallbackVendorId={selectedVendor._id}
             vendorName={selectedVendor.name}
             vendorProfilePic={getProfilePicUrl(selectedVendor.profilePic)}
             vendorType="proposal"

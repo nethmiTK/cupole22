@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import AdminLayout from '../components/AdminLayout';
 import { Search, Filter, Phone, CheckCircle, XCircle, Trash2, Eye, User, AlertCircle } from 'lucide-react';
-import VendorDetailModal from '../components/VendorDetailModal';
+import ProposalVendorQuickViewModal from '../components/ProposalVendorQuickViewModal';
 
 interface AlbumVendor {
   _id: string;
@@ -364,14 +364,14 @@ export default function AlbumVendorsPage() {
 
         {/* Modal */}
         {selectedVendor && (
-          <VendorDetailModal
+          <ProposalVendorQuickViewModal
             isOpen={isModalOpen}
             onClose={() => {
               setIsModalOpen(false);
               setSelectedVendor(null);
             }}
-            onRefresh={fetchVendors}
             vendorId={selectedVendor.vendor_id || selectedVendor._id}
+            fallbackVendorId={selectedVendor._id}
             vendorName={selectedVendor.name}
             vendorProfilePic={getProfilePicUrl(selectedVendor.profilePic)}
             vendorType="album"
