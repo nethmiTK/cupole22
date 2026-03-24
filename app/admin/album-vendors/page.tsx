@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import AdminLayout from '../components/AdminLayout';
-import { Search, Filter, Phone, CheckCircle, XCircle, Trash2, Eye, User, AlertCircle } from 'lucide-react';
+import { Search, Filter, Phone, CheckCircle, XCircle, Trash2, Eye, User, AlertCircle, Copy, Check } from 'lucide-react';
 import ProposalVendorQuickViewModal from '../components/ProposalVendorQuickViewModal';
 
 interface AlbumVendor {
@@ -47,6 +47,14 @@ export default function AlbumVendorsPage() {
   const [limit] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  };
 
   useEffect(() => {
     setPage(1);
@@ -263,7 +271,22 @@ export default function AlbumVendorsPage() {
 
                         {/* Address */}
                         <td className="px-6 py-4 text-sm text-gray-600">
-                          {vendor.city || '—'}
+                          {vendor.city ? (
+                            <button
+                              onClick={() => copyToClipboard(vendor.city || '', vendor._id)}
+                              title="Click to copy address"
+                              className="group flex items-center gap-2 hover:bg-gray-100 px-2 py-1 rounded transition-colors"
+                            >
+                              <span className="font-medium">{vendor.city}</span>
+                              {copiedId === vendor._id ? (
+                                <Check className="w-3.5 h-3.5 text-green-600" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5 text-gray-400 group-hover:text-gray-600" />
+                              )}
+                            </button>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
                         </td>
 
                         {/* WhatsApp */}

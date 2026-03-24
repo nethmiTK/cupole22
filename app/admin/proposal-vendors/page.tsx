@@ -76,7 +76,31 @@ export default function ProposalVendorsPage() {
       const res = await fetch(url.toString(), { headers });
       if (res.ok) {
         const data = await res.json();
-        setVendors(data.vendors || []);
+        let vendors = data.vendors || [];
+
+        // Enrich vendor data with email and address from vendor-detail endpoint
+        vendors = await Promise.all(
+          vendors.map(async (vendor: ProposalVendor) => {
+            try {
+              const vendorDetailRes = await fetch(`${API_URL}/admin/vendor-detail/${vendor._id}?type=proposal`, { headers });
+              if (vendorDetailRes.ok) {
+                const detailData = await vendorDetailRes.json();
+                if (detailData.profile) {
+                  return {
+                    ...vendor,
+                    email: vendor.email || detailData.profile.email,
+                    address: vendor.address || detailData.profile.address,
+                  };
+                }
+              }
+            } catch {
+              // Keep original vendor data if enrichment fails
+            }
+            return vendor;
+          })
+        );
+
+        setVendors(vendors);
         if (data.pagination) {
           setTotalPages(data.pagination.pages);
           setTotalRecords(data.pagination.total);
