@@ -407,25 +407,23 @@ export default function ContactsPage() {
                             </div>
 
                             {/* Modal Footer */}
-                            <div className="p-8 border-t border-gray-100 bg-gray-50/50 space-y-3">
-                                <div className="grid grid-cols-2 gap-3">
-                                    <a
-                                        href={`mailto:${selectedMessage.email}?subject=Re: ${selectedMessage.subject || 'Enquiry'}&body=Hello ${selectedMessage.name},`}
-                                        onClick={() => updateStatus(selectedMessage._id, 'replied')}
-                                        className="bg-gray-900 hover:bg-black text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
-                                    >
-                                        <Mail size={18} /> Email Reply
-                                    </a>
+                            <div className="p-8 border-t border-gray-100 bg-gray-50/50 space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    
                                     <a
                                         href={getWhatsAppLink(selectedMessage.phone, selectedMessage.name)}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         onClick={() => updateStatus(selectedMessage._id, 'replied')}
-                                        className="bg-[#25D366] hover:bg-[#128C7E] text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
+                                        className="bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg transition-all flex items-center justify-center gap-3 active:scale-[0.98] border border-emerald-400/20"
                                     >
-                                        <MessageCircle size={18} /> WhatsApp
+                                        <MessageCircle size={18} /> 
+                                        <span>WhatsApp</span>
                                     </a>
                                 </div>
+                                <p className="text-center text-[9px] font-black text-gray-400 uppercase tracking-widest pt-2">
+                                    Secured Communication Portal
+                                </p>
                             </div>
                         </motion.div>
                     </motion.div>

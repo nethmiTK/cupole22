@@ -9,6 +9,8 @@ interface ProposalVendor {
   _id: string;
   vendor_id: string;
   name: string;
+  email?: string;
+  address?: string;
   profilePic: string;
   whatsappNo: string;
   slipPhoto: string;
@@ -174,6 +176,8 @@ export default function ProposalVendorsPage() {
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Vendor</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Address</th>
                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">WhatsApp</th>
                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Joined</th>
                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Plan</th>
@@ -191,7 +195,7 @@ export default function ProposalVendorsPage() {
                   ))
                 ) : displayedVendors.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
                       No proposal vendors found.
                     </td>
                   </tr>
@@ -236,6 +240,22 @@ export default function ProposalVendorsPage() {
                               )}
                             </div>
                           </div>
+                        </td>
+
+                        {/* Email */}
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {vendor.email ? (
+                            <a href={`mailto:${vendor.email}`} className="text-blue-600 hover:text-blue-800 underline">
+                              {vendor.email}
+                            </a>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </td>
+
+                        {/* Address */}
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {vendor.address || '—'}
                         </td>
 
                         {/* WhatsApp */}

@@ -69,7 +69,31 @@ export default function AlbumVendorsPage() {
       const res = await fetch(url.toString());
       if (res.ok) {
         const data = await res.json();
-        setVendors(data.vendors || []);
+        let vendors = data.vendors || [];
+        
+        // Enrich vendor data with email and city from vendor-detail endpoint
+        vendors = await Promise.all(
+          vendors.map(async (vendor: AlbumVendor) => {
+            try {
+              const vendorDetailRes = await fetch(`${API_URL}/admin/vendor-detail/${vendor._id}?type=album`);
+              if (vendorDetailRes.ok) {
+                const detailData = await vendorDetailRes.json();
+                if (detailData.profile) {
+                  return {
+                    ...vendor,
+                    email: vendor.email || detailData.profile.email,
+                    city: vendor.city || detailData.profile.city,
+                  };
+                }
+              }
+            } catch {
+              // Keep original vendor data if enrichment fails
+            }
+            return vendor;
+          })
+        );
+        
+        setVendors(vendors);
         if (data.pagination) {
           setTotalPages(data.pagination.pages);
           setTotalRecords(data.pagination.total);
@@ -161,6 +185,8 @@ export default function AlbumVendorsPage() {
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Vendor</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Address</th>
                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">WhatsApp</th>
                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Joined</th>
                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Slip</th>
@@ -177,7 +203,7 @@ export default function AlbumVendorsPage() {
                   ))
                 ) : displayedVendors.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                       No album vendors found.
                     </td>
                   </tr>
@@ -215,9 +241,6 @@ export default function AlbumVendorsPage() {
                             )}
                             <div>
                               <div className="font-semibold text-gray-900 text-sm">{vendor.name || '—'}</div>
-                              {vendor.email && (
-                                <div className="text-xs text-gray-400 mt-0.5">{vendor.email}</div>
-                              )}
                               {expired && !isActive && (
                                 <div className="flex items-center gap-1 text-red-600 text-[10px] font-bold uppercase tracking-wide mt-0.5">
                                   <AlertCircle className="w-3 h-3" /> Payment Overdue
@@ -225,6 +248,22 @@ export default function AlbumVendorsPage() {
                               )}
                             </div>
                           </div>
+                        </td>
+
+                        {/* Email */}
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {vendor.email ? (
+                            <a href={`mailto:${vendor.email}`} className="text-blue-600 hover:text-blue-800 underline">
+                              {vendor.email}
+                            </a>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </td>
+
+                        {/* Address */}
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {vendor.city || '—'}
                         </td>
 
                         {/* WhatsApp */}

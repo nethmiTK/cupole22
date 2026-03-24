@@ -125,8 +125,8 @@ export default function ProposalVendorQuickViewModal({
                     <span className="font-semibold text-gray-900 text-right">{profile?.email || 'N/A'}</span>
                   </div>
                   <div className="flex items-center justify-between gap-4 border-b border-gray-200 pb-2">
-                    <span className="text-gray-500 flex items-center gap-1"><MapPin className="w-3 h-3" /> City</span>
-                    <span className="font-semibold text-gray-900 text-right">{profile?.city || 'N/A'}</span>
+                    <span className="text-gray-500 flex items-center gap-1"><MapPin className="w-3 h-3" /> Address</span>
+                    <span className="font-semibold text-gray-900 text-right">{profile?.address || profile?.city || 'N/A'}</span>
                   </div>
                   <div className="flex items-center justify-between gap-4">
                     <span className="text-gray-500">Status</span>
