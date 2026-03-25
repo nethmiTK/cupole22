@@ -48,12 +48,50 @@ export default function AlbumVendorsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text).then(() => {
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);
     });
+  };
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelectedIds(new Set(vendors.map(v => v._id)));
+    } else {
+      setSelectedIds(new Set());
+    }
+  };
+
+  const handleSelectOne = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const deleteSelected = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Are you sure you want to delete ${selectedIds.size} vendors?`)) return;
+
+    setLoading(true);
+    try {
+      await Promise.all(
+        Array.from(selectedIds).map(id => fetch(`${API_URL}/album-vendors/${id}`, { method: 'DELETE' }))
+      );
+      setSelectedIds(new Set());
+      fetchVendors();
+    } catch (error) {
+      console.error('Failed to delete selected vendors', error);
+      alert('Failed to delete some vendors');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -187,14 +225,41 @@ export default function AlbumVendorsPage() {
         </div>
 
         {/* Table */}
+        {selectedIds.size > 0 && (
+          <div className="bg-rose-50 border border-rose-200 rounded-lg p-3 flex items-center justify-between">
+            <span className="text-rose-700 font-medium text-sm">{selectedIds.size} vendors selected</span>
+            <button
+              onClick={deleteSelected}
+              className="text-white bg-rose-600 hover:bg-rose-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete Selected
+            </button>
+          </div>
+        )}
+
         <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left font-sans">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="px-6 py-4 w-10">
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-300 text-rose-600 focus:ring-rose-500 w-4 h-4"
+                      checked={vendors.length > 0 && selectedIds.size === vendors.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedIds(new Set(vendors.map(v => v._id)));
+                        } else {
+                          setSelectedIds(new Set());
+                        }
+                      }}
+                    />
+                  </th>
                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Vendor</th>
                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Address</th>
+                  {/* Address Removed */}
                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">WhatsApp</th>
                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Joined</th>
                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Slip</th>
@@ -206,7 +271,7 @@ export default function AlbumVendorsPage() {
                 {loading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <tr key={i} className="animate-pulse">
-                      <td colSpan={5} className="px-6 py-4 h-16 bg-gray-50/50"></td>
+                      <td colSpan={8} className="px-6 py-4 h-16 bg-gray-50/50"></td>
                     </tr>
                   ))
                 ) : displayedVendors.length === 0 ? (
@@ -221,15 +286,33 @@ export default function AlbumVendorsPage() {
                     const picUrl = getProfilePicUrl(vendor.profilePic);
                     const isActive = vendor.status === 'active';
                     const isLoading = actionLoadingId === vendor._id;
+                    const rowClassName = `transition-colors ${expired && !isActive
+                      ? 'bg-red-50 hover:bg-red-100 border-l-4 border-l-red-500'
+                      : 'hover:bg-gray-50'
+                    }`;
 
                     return (
                       <tr
                         key={vendor._id}
-                        className={`transition-colors ${expired && !isActive
-                          ? 'bg-red-50 border-l-4 border-red-500 hover:bg-red-100'
-                          : 'hover:bg-gray-50'
-                          }`}
+                        className={rowClassName}
                       >
+                        <td className="px-6 py-4">
+                          <input
+                            type="checkbox"
+                            className="rounded border-gray-300 text-rose-600 focus:ring-rose-500 w-4 h-4"
+                            checked={selectedIds.has(vendor._id)}
+                            onChange={() => {
+                              const newSet = new Set(selectedIds);
+                              if (newSet.has(vendor._id)) {
+                                newSet.delete(vendor._id);
+                              } else {
+                                newSet.add(vendor._id);
+                              }
+                              setSelectedIds(newSet);
+                            }}
+                          />
+                        </td>
+
                         {/* Vendor col with profile pic */}
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
@@ -264,26 +347,6 @@ export default function AlbumVendorsPage() {
                             <a href={`mailto:${vendor.email}`} className="text-blue-600 hover:text-blue-800 underline">
                               {vendor.email}
                             </a>
-                          ) : (
-                            <span className="text-gray-400">—</span>
-                          )}
-                        </td>
-
-                        {/* Address */}
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          {vendor.city ? (
-                            <button
-                              onClick={() => copyToClipboard(vendor.city || '', vendor._id)}
-                              title="Click to copy address"
-                              className="group flex items-center gap-2 hover:bg-gray-100 px-2 py-1 rounded transition-colors"
-                            >
-                              <span className="font-medium">{vendor.city}</span>
-                              {copiedId === vendor._id ? (
-                                <Check className="w-3.5 h-3.5 text-green-600" />
-                              ) : (
-                                <Copy className="w-3.5 h-3.5 text-gray-400 group-hover:text-gray-600" />
-                              )}
-                            </button>
                           ) : (
                             <span className="text-gray-400">—</span>
                           )}

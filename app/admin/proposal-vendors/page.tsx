@@ -50,6 +50,7 @@ export default function ProposalVendorsPage() {
   const [limit] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     setPage(1);
@@ -59,6 +60,29 @@ export default function ProposalVendorsPage() {
   useEffect(() => {
     fetchVendors(page);
   }, [page]);
+
+  const deleteSelected = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Are you sure you want to delete ${selectedIds.size} vendors?`)) return;
+
+    setLoading(true);
+    const token = localStorage.getItem('adminToken');
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    try {
+      await Promise.all(
+        Array.from(selectedIds).map(id => fetch(`${API_URL}/admin/proposal-vendors/${id}`, { method: 'DELETE', headers }))
+      );
+      setSelectedIds(new Set());
+      fetchVendors();
+    } catch (error) {
+      console.error('Failed to delete selected vendors', error);
+      alert('Failed to delete some vendors');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchVendors = async (targetPage = page) => {
     try {
@@ -123,12 +147,19 @@ export default function ProposalVendorsPage() {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      await fetch(`${API_URL}/admin/proposal-vendors/${vendor._id}/status`, {
+      const res = await fetch(`${API_URL}/admin/proposal-vendors/${vendor._id}/status`, {
         method: 'PATCH',
         headers,
         body: JSON.stringify({ status: newStatus }),
       });
-      fetchVendors();
+
+      if (res.ok) {
+        setVendors(prev =>
+          prev.map(v => (v._id === vendor._id ? { ...v, status: newStatus } : v))
+        );
+      } else {
+        alert('Failed to update status');
+      }
     } finally {
       setActionLoadingId(null);
     }
@@ -145,7 +176,6 @@ export default function ProposalVendorsPage() {
       const res = await fetch(`${API_URL}/admin/proposal-vendors/${id}`, { method: 'DELETE', headers });
       if (res.ok) {
         setVendors(prev => prev.filter(v => v._id !== id));
-        fetchVendors();
       } else {
         alert('Failed to delete vendor');
       }
@@ -163,7 +193,7 @@ export default function ProposalVendorsPage() {
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Proposal Vendors</h1>
-          <p className="text-gray-500 mt-1">Manage proposal service vendors · Rows older than 7 days are highlighted red</p>
+          <p className="text-gray-500 mt-1">Manage proposal service vendors · Rows older than 7 days without activation are highlighted red</p>
         </div>
 
         {/* Filters */}
@@ -194,16 +224,41 @@ export default function ProposalVendorsPage() {
         </div>
 
         {/* Table */}
+        {selectedIds.size > 0 && (
+          <div className="bg-rose-50 border border-rose-200 rounded-lg p-3 flex items-center justify-between">
+            <span className="text-rose-700 font-medium text-sm">{selectedIds.size} vendors selected</span>
+            <button
+              onClick={deleteSelected}
+              className="text-white bg-rose-600 hover:bg-rose-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete Selected
+            </button>
+          </div>
+        )}
+
         <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left font-sans">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="px-6 py-4 w-10">
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-300 text-rose-600 focus:ring-rose-500 w-4 h-4"
+                      checked={vendors.length > 0 && selectedIds.size === vendors.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedIds(new Set(vendors.map(v => v._id)));
+                        } else {
+                          setSelectedIds(new Set());
+                        }
+                      }}
+                    />
+                  </th>
                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Vendor</th>
                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Address</th>
                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">WhatsApp</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Joined</th>
                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Plan</th>
                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Slip</th>
                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
@@ -214,12 +269,12 @@ export default function ProposalVendorsPage() {
                 {loading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <tr key={i} className="animate-pulse">
-                      <td colSpan={5} className="px-6 py-4 h-16 bg-gray-50/50"></td>
+                      <td colSpan={8} className="px-6 py-4 h-16 bg-gray-50/50"></td>
                     </tr>
                   ))
                 ) : displayedVendors.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                       No proposal vendors found.
                     </td>
                   </tr>
@@ -229,15 +284,33 @@ export default function ProposalVendorsPage() {
                     const picUrl = getProfilePicUrl(vendor.profilePic);
                     const isActive = vendor.status === 'active';
                     const isLoading = actionLoadingId === vendor._id;
+                    const rowClassName = `transition-colors ${expired && !isActive
+                      ? 'bg-red-50 hover:bg-red-100 border-l-4 border-l-red-500' 
+                      : 'hover:bg-gray-50'
+                    }`;
 
                     return (
                       <tr
                         key={vendor._id}
-                        className={`transition-colors ${expired && vendor.status !== 'active'
-                          ? 'bg-red-50 border-l-4 border-red-500 hover:bg-red-100'
-                          : 'hover:bg-gray-50'
-                          }`}
+                        className={rowClassName}
                       >
+                        <td className="px-6 py-4">
+                          <input
+                            type="checkbox"
+                            className="rounded border-gray-300 text-rose-600 focus:ring-rose-500 w-4 h-4"
+                            checked={selectedIds.has(vendor._id)}
+                            onChange={() => {
+                              const newSet = new Set(selectedIds);
+                              if (newSet.has(vendor._id)) {
+                                newSet.delete(vendor._id);
+                              } else {
+                                newSet.add(vendor._id);
+                              }
+                              setSelectedIds(newSet);
+                            }}
+                          />
+                        </td>
+                        
                         {/* Vendor col with profile pic */}
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
@@ -277,22 +350,12 @@ export default function ProposalVendorsPage() {
                           )}
                         </td>
 
-                        {/* Address */}
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          {vendor.address || '—'}
-                        </td>
-
                         {/* WhatsApp */}
                         <td className="px-6 py-4 text-sm text-gray-600">
                           <div className="flex items-center gap-1.5">
                             <Phone className="w-3.5 h-3.5 text-gray-400" />
                             {vendor.whatsappNo || '—'}
                           </div>
-                        </td>
-
-                        {/* Joined date */}
-                        <td className="px-6 py-4 text-sm text-gray-500">
-                          {vendor.createdAt ? new Date(vendor.createdAt).toLocaleDateString() : '—'}
                         </td>
 
                         {/* Plan */}
