@@ -1,216 +1,166 @@
-"use client";
+'use client';
 
-import { useState, FormEvent, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { User, Lock, ArrowRight, Heart, Eye, EyeOff } from "lucide-react";
-import Image from "next/image";
-import { toast } from "react-toastify";
+import { useState, FormEvent, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
+import { Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { toast } from 'react-toastify';
+import API_URL from '../../lib/api';
 
-export default function Login() {
-  const [username, setUsername] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
+export default function LoginPage() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [showBgImage, setShowBgImage] = useState(true);
-  const [showLogoImage, setShowLogoImage] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
-    const token = localStorage.getItem("adminToken");
-    const adminData = localStorage.getItem("adminData");
-
-    if (token && adminData) {
-      router.replace("/admin/dashboard");
+    const token = localStorage.getItem('adminToken');
+    if (token) {
+      router.replace('/admin/dashboard');
       return;
     }
-
     setIsCheckingAuth(false);
   }, [router]);
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setErrorMessage("");
+    setErrorMessage('');
 
-    setTimeout(() => {
-      if (username === "memo22@albumCB" && password === "cb22@memoALBUM") {
-        localStorage.setItem("adminToken", "memo-admin-token");
-        localStorage.setItem("adminData", JSON.stringify({
-          name: "Admin",
-          email: username,
-        }));
+    try {
+      const res = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
 
-        toast.success("Login successful");
-        setTimeout(() => router.replace("/admin/dashboard"), 500);
-      } else {
-        setErrorMessage("Wrong username or password");
-        setIsLoading(false);
+      const data = await res.json();
+
+      if (!res.ok) {
+        setErrorMessage(data.error || 'Login failed');
+        return;
       }
-    }, 800);
+
+      if (data.user.role !== 'superadmin') {
+        setErrorMessage('Access denied. Super admin only.');
+        return;
+      }
+
+      localStorage.setItem('adminToken', data.token);
+      localStorage.setItem('adminUser', JSON.stringify(data.user));
+
+      toast.success('Login successful');
+      setTimeout(() => router.replace('/admin/dashboard'), 400);
+    } catch {
+      setErrorMessage('Server error. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (isCheckingAuth) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-rose-100 via-rose-50 to-white">
+      <div className="min-h-screen flex items-center justify-center bg-rose-50">
         <div className="w-10 h-10 border-2 border-rose-200 border-t-rose-500 rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-rose-50">
-      <div className="absolute inset-0 z-0 bg-[radial-gradient(circle_at_20%_20%,#ffe8ef_0%,#ffdce6_30%,#f9d1dd_55%,#f6c6d5_100%)]">
-        {showBgImage && (
-          <Image
-            src="/login-bg.png"
-            alt="Wedding Background"
-            fill
-            className="object-cover"
-            priority
-            onError={() => setShowBgImage(false)}
-          />
-        )}
-        <div className="absolute inset-0 bg-black/15 backdrop-blur-[1px]" />
-        <div className="absolute inset-0 bg-gradient-to-br from-rose-500/10 to-black/35" />
-      </div>
-
-      <div className="absolute inset-0 pointer-events-none opacity-30 z-1">
-        {[...Array(6)].map((_, i) => (
-          <motion.div
-            key={i}
-            initial={{ y: -20, opacity: 0 }}
-            animate={{
-              y: "110vh",
-              opacity: [0, 1, 1, 0],
-              x: Math.sin(i) * 50
-            }}
-            transition={{
-              duration: 12 + i * 2,
-              repeat: Infinity,
-              ease: "linear",
-              delay: i * 2
-            }}
-            className="absolute"
-            style={{ left: `${(i + 1) * 15}%` }}
-          >
-            <Heart size={20} className="text-white/40 fill-white/20" />
-          </motion.div>
-        ))}
-      </div>
-
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-rose-50 via-white to-rose-50 p-4">
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
-        className="w-full max-w-md px-6 z-10"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-md"
       >
-        <div className="bg-white/70 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.3)] border border-white/40 p-8 md:p-10 overflow-hidden relative group">
-          <div className="absolute -top-24 -left-24 w-48 h-48 bg-rose-400/20 blur-[80px] rounded-full group-hover:bg-rose-400/30 transition-colors duration-700" />
-
-          <div className="text-center mb-6 relative">
-            <div className="mx-auto mb-4 flex justify-center">
-              {showLogoImage ? (
-                <Image
-                  src="/couplecanvas-logo.png"
-                  alt="CoupleCanvas logo"
-                  width={130}
-                  height={130}
-                  className="h-[90px] w-auto object-contain"
-                  onError={() => setShowLogoImage(false)}
-                />
-              ) : (
-                <div className="w-16 h-16 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center font-black text-xl">
-                  CC
-                </div>
-              )}
+        <div className="bg-white rounded-3xl shadow-2xl shadow-rose-100 border border-rose-100 p-10">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-gradient-to-br from-rose-500 to-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-rose-200">
+              <span className="text-white font-black text-xl">CC</span>
             </div>
-            <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight mb-1"> Memo Album</h1>
-            <p className="text-gray-600 text-sm font-medium">Welcome back admin!</p>
+            <h1 className="text-3xl font-black text-gray-900">CoupleCanvas</h1>
+            <p className="text-gray-400 text-sm font-medium mt-1">
+              Super Admin Panel
+            </p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-5 relative">
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Username</label>
-                <div className="relative group/input">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors group-focus-within/input:text-rose-500 text-gray-400">
-                    <User size={18} />
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Enter username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 bg-white/50 border border-gray-200/50 rounded-xl focus:bg-white focus:ring-4 focus:ring-rose-500/10 focus:border-rose-400 outline-none transition-all duration-300 text-gray-800 placeholder:text-gray-400 font-medium text-sm"
-                    required
-                  />
-                </div>
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+                Email
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  placeholder="admin@memoalbum.com"
+                  className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all"
+                />
               </div>
+            </div>
 
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Password</label>
-                <div className="relative group/input">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors group-focus-within/input:text-rose-500 text-gray-400">
-                    <Lock size={18} />
-                  </div>
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-11 pr-12 py-3 bg-white/50 border border-gray-200/50 rounded-xl focus:bg-white focus:ring-4 focus:ring-rose-500/10 focus:border-rose-400 outline-none transition-all duration-300 text-gray-800 placeholder:text-gray-400 font-medium text-sm"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    onMouseDown={(e) => e.preventDefault()}
-                    className="absolute inset-y-0 right-0 w-11 flex items-center justify-center text-gray-400 hover:text-rose-500 active:text-rose-600 transition-colors bg-transparent border-0 outline-none"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                    title={showPassword ? "Hide password" : "Show password"}
-                  >
-                    <span className="pointer-events-none">
-                      {showPassword ? <EyeOff size={18} strokeWidth={2.1} /> : <Eye size={18} strokeWidth={2.1} />}
-                    </span>
-                  </button>
-                </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+                Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  placeholder="••••••••"
+                  className="w-full pl-11 pr-12 py-3 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((p) => !p)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-rose-500 transition-colors"
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
               </div>
             </div>
 
             {errorMessage && (
-              <p className="text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
+              <p className="text-sm text-red-600 bg-red-50 border border-red-100 px-4 py-3 rounded-xl">
                 {errorMessage}
               </p>
             )}
 
-            
             <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
+              type="submit"
               disabled={isLoading}
-              className={`w-full py-3.5 rounded-xl font-bold text-white shadow-lg shadow-rose-500/25 flex items-center justify-center gap-2 transition-all duration-300 ${isLoading
-                ? "bg-rose-400 cursor-not-allowed"
-                : "bg-gradient-to-r from-rose-500 to-rose-600 hover:shadow-rose-500/40"
-                }`}
+              className="w-full py-3.5 bg-gradient-to-r from-rose-500 to-rose-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-rose-200 flex items-center justify-center gap-2 disabled:opacity-60 transition-all"
             >
               {isLoading ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
                   <span>Sign In</span>
-                  <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </motion.button>
           </form>
- 
         </div>
 
-        <p className="text-center mt-6 text-white/70 text-[10px] font-bold uppercase tracking-[0.3em] drop-shadow-sm">
-          Powered by code builder
+        <p className="text-center mt-6 text-gray-400 text-xs">
+          CoupleCanvas Admin · Confidential
         </p>
       </motion.div>
     </div>
