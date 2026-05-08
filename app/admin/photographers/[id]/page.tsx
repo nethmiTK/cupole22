@@ -180,8 +180,8 @@ export default function PhotographerDetailPage() {
           </div>
         </div>
 
-        {/* Stats & Albums Section (kept same as before) */}
-        {/* ... your existing stats and albums code ... */}
+        {/* Stats & Albums Section */}
+        
 
       </div>
 
@@ -265,12 +265,27 @@ function ResetPasswordModal({ photographerId, onClose }: { photographerId: strin
 }
 
 /* ==================== Edit Modal ==================== */
-function EditPhotographerModal({ photographer, onClose, onUpdated }: any) {
+interface Photographer {
+  _id: string;
+  name: string;
+  email: string;
+  phone: string;
+  bio: string;
+  // Add other fields if needed
+}
+
+interface EditPhotographerModalProps {
+  photographer: Photographer;
+  onClose: () => void;
+  onUpdated: () => void;
+}
+
+function EditPhotographerModal({ photographer, onClose, onUpdated }: EditPhotographerModalProps) {
   const [form, setForm] = useState({
-    name: photographer.name || '',
-    email: photographer.email || '',
-    phone: photographer.phone || '',
-    bio: photographer.bio || '',
+    name: photographer.name,
+    email: photographer.email,
+    phone: photographer.phone,
+    bio: photographer.bio,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
