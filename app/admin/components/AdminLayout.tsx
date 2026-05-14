@@ -3,6 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import {
+  clearAuthSession,
+  getSafeReturnPath,
+  getStoredUser,
+  isSessionValid,
+} from '@/lib/auth';
 
 import {
   LayoutDashboard,
@@ -33,32 +39,30 @@ export default function AdminLayout({
   const [checking, setChecking] = useState(true);
   const [adminName, setAdminName] = useState('Admin');
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('adminToken');
-
-    if (!token) {
-      router.replace('/login');
+    if (!isSessionValid()) {
+      router.replace(`/login?next=${encodeURIComponent(pathname)}`);
       return;
     }
 
-    const user = localStorage.getItem('adminUser');
+    const user = getStoredUser();
 
     if (user) {
       try {
-        const parsed = JSON.parse(user);
-        setAdminName(parsed.name || 'Admin');
+        setAdminName(user.name || user.fullName || 'Admin');
       } catch {}
     }
 
     setChecking(false);
-  }, [router]);
+  }, [pathname, router]);
 
   const logout = () => {
-    localStorage.removeItem('adminToken');
-    localStorage.removeItem('adminUser');
+    clearAuthSession();
 
-    router.push('/login');
+    // send to login and include return path so user can login and return
+    router.push(`/login?next=${encodeURIComponent(getSafeReturnPath(pathname))}`);
   };
 
   const menuItems: MenuItem[] = [
@@ -207,20 +211,37 @@ export default function AdminLayout({
               <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500"></div>
             </button>
 
-            <div className="flex items-center gap-3 bg-rose-50 px-4 py-2 rounded-2xl">
-              <div className="w-10 h-10 rounded-full bg-[#B11469] flex items-center justify-center text-white font-bold">
-                {adminName.charAt(0).toUpperCase()}
-              </div>
+            <div className="relative">
+              <button
+                onClick={() => setProfileOpen((s) => !s)}
+                className="flex items-center gap-3 bg-rose-50 px-4 py-2 rounded-2xl"
+              >
+                <div className="w-10 h-10 rounded-full bg-[#B11469] flex items-center justify-center text-white font-bold">
+                  {adminName.charAt(0).toUpperCase()}
+                </div>
 
-              <div className="hidden sm:block">
-                <h4 className="text-sm font-semibold text-gray-700">
-                  {adminName}
-                </h4>
+                <div className="hidden sm:block">
+                  <h4 className="text-sm font-semibold text-gray-700">
+                    {adminName}
+                  </h4>
 
-                <p className="text-xs text-gray-400">
-                  Super Admin
-                </p>
-              </div>
+                  <p className="text-xs text-gray-400">Super Admin</p>
+                </div>
+              </button>
+
+              {profileOpen && (
+                <div className="absolute right-0 mt-2 w-44 bg-white rounded-2xl shadow-lg border border-rose-100 p-2 z-50">
+                  <button
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-rose-50 text-rose-600 font-medium"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      logout();
+                    }}
+                  >
+                    Logout
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>

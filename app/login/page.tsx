@@ -1,7 +1,14 @@
-'use client';
+"use client";
 
 import { apiFetch } from "@/lib/api";
-import { useState } from 'react';
+import {
+  getSafeReturnPath,
+  isSessionValid,
+  resolveAuthExpiryMs,
+  saveAuthSession,
+} from "@/lib/auth";
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { FaEnvelope, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
 
 export default function LoginPage() {
@@ -9,6 +16,19 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = getSafeReturnPath(searchParams?.get('next'));
+
+  useEffect(() => {
+    if (isSessionValid()) {
+      router.replace(nextPath);
+      return;
+    }
+
+    setCheckingSession(false);
+  }, [nextPath, router]);
 
  const handleLogin = async (e: React.FormEvent) => {
   e.preventDefault();
@@ -29,11 +49,16 @@ export default function LoginPage() {
     }
 
     // ✅ save token
-    localStorage.setItem("adminToken", data.token);
+    saveAuthSession({
+      token: data.token,
+      expiryMs: resolveAuthExpiryMs(data, data.token),
+      user: data.user,
+    });
 
     alert("Login success 🌹");
 
-    window.location.href = "/admin/dashboard";
+    // redirect to the return URL or default dashboard
+    router.replace(nextPath);
 
   } catch (err: any) {
     alert(err.message);
@@ -42,9 +67,16 @@ export default function LoginPage() {
     setLoading(false);
   }
 };
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-rose-50 via-white to-pink-100 px-4">
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-rose-50 via-white to-pink-100 px-4">
+        <div className="w-12 h-12 border-4 border-rose-200 border-t-[#B11469] rounded-full animate-spin" />
+      </div>
+    );
+  }
 
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-rose-50 via-white to-pink-100 px-4">
       {/* background glow */}
       <div className="absolute w-72 h-72 bg-rose-200 rounded-full blur-3xl opacity-40 top-10 left-10"></div>
       <div className="absolute w-72 h-72 bg-pink-200 rounded-full blur-3xl opacity-40 bottom-10 right-10"></div>
