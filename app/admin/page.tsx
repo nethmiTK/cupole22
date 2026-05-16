@@ -43,7 +43,7 @@ export default function PhotographerAdminDashboard() {
             <p className="text-sm text-[#4e4145]">Welcome back, Curator</p>
             <p className="mt-1 text-sm text-[#7e6d73]">Finalizing your editorial archive...</p>
 
-            <p className="mt-12 text-7xl italic text-[#d15f9e] md:text-9xl" style={{ fontFamily: 'Newsreader, serif' }}>
+            <p className="mt-12 text-7xl italic md:text-9xl" style={{ fontFamily: 'Newsreader, serif', color: '#B10E6B' }}>
               {progress}%
             </p>
 
@@ -53,14 +53,14 @@ export default function PhotographerAdminDashboard() {
 
             <div className="mx-auto mt-6 h-2 w-full max-w-md overflow-hidden rounded-full bg-[#eadde3]">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-[#920857] to-[#c54792] transition-all duration-300"
+                className="h-full rounded-full bg-[#B10E6B] transition-all duration-300"
                 style={{ width: `${progress}%` }}
               />
             </div>
 
             <div className="mx-auto mt-12 grid max-w-lg grid-cols-3 gap-4 opacity-70">
               <div className="h-20 rounded-xl bg-[#efe3e8]" />
-              <div className="h-24 rounded-xl bg-[#eadde3]" />
+              <div className="h-24 rounded-xl bg-[#B10E6B]" />
               <div className="h-20 rounded-xl bg-[#efe3e8]" />
             </div>
 

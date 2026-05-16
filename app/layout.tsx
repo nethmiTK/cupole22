@@ -1,3 +1,4 @@
+// @ts-expect-error: CSS import handled by Next.js
 import './globals.css';
 import type { ReactNode } from 'react';
 

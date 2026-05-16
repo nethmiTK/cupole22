@@ -34,10 +34,11 @@ export default function PhotographerSidebar({ isMobileOpen, onClose }: Photograp
     { label: 'Albums', href: '/admin/albums', icon: <Image size={20} /> },
     { label: 'Customers', href: '/admin/customers', icon: <Users size={20} /> },
     { label: 'Payments', href: '/admin/payments', icon: <CreditCard size={20} /> },
-    { label: 'Photographers', href: '/admin/photographers', icon: <UserCog size={20} /> },
+    { label: 'User Management', href: '/admin/photographers', icon: <UserCog size={20} /> },
   ];
 
   const isActive = (href: string) => pathname === href;
+  const isProfileActive = isActive('/admin/profile');
 
   const handleLogout = () => {
     clearAuthSession();
@@ -49,12 +50,12 @@ export default function PhotographerSidebar({ isMobileOpen, onClose }: Photograp
     <div className="flex h-full min-h-0 flex-col">
       {/* Header */}
       <div className="px-5 py-6 border-b" style={{ borderColor: 'rgba(229, 204, 212, 0.2)' }}>
-        <h1
-          className="text-lg font-serif font-semibold italic mb-1"
-          style={{ color: '#B11469' }}
-        >
-          MemoAlbum
-        </h1>
+          <h1
+            className="text-lg font-serif font-semibold italic mb-1"
+            style={{ color: '#B10E6B' }}
+          >
+            MemoAlbum
+          </h1>
         <p
           className="text-[11px] tracking-[0.28em] font-semibold uppercase"
           style={{ color: '#9B9095' }}
@@ -74,12 +75,12 @@ export default function PhotographerSidebar({ isMobileOpen, onClose }: Photograp
               onClick={onClose}
               className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 relative ${
                 active
-                  ? 'font-semibold text-[#D23284]'
-                  : 'text-[#6B7387] hover:text-[#D23284]'
+                  ? 'font-semibold text-[#B10E6B]'
+                  : 'text-[#6B7387] hover:text-[#B10E6B]'
               }`}
             >
-              {active && <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r-full bg-[#D23284]"></div>}
-              <div className={`flex-shrink-0 w-5 h-5 ${active ? 'text-[#D23284]' : 'text-[#6B7387]'}`}>{item.icon}</div>
+              {active && <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r-full bg-[#B10E6B]"></div>}
+              <div className={`flex-shrink-0 w-5 h-5 ${active ? 'text-[#B10E6B]' : 'text-[#6B7387]'}`}>{item.icon}</div>
               <span className="text-sm font-medium tracking-wide">{item.label}</span>
             </Link>
           );
@@ -90,16 +91,19 @@ export default function PhotographerSidebar({ isMobileOpen, onClose }: Photograp
         <Link
           href="/admin/profile"
           onClick={onClose}
-          className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-[#6B7387] hover:text-[#D23284]"
+          className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 relative ${
+            isProfileActive ? 'font-semibold text-[#B10E6B]' : 'text-[#6B7387] hover:text-[#B10E6B]'
+          }`}
         >
-          <CircleUserRound size={20} />
+          {isProfileActive && <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r-full bg-[#B10E6B]"></div>}
+          <CircleUserRound size={20} className={isProfileActive ? 'text-[#B10E6B]' : 'text-[#6B7387]'} />
           <span className="text-sm font-medium tracking-wide">Profile</span>
         </Link>
 
         <button
           type="button"
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-[#6B7387] hover:text-[#D23284] text-left"
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-[#6B7387] hover:text-[#B10E6B] text-left"
         >
           <LogOut size={20} />
           <span className="text-sm font-medium tracking-wide">Logout</span>

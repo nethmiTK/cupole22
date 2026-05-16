@@ -1,7 +1,19 @@
 import React from 'react'
- function page() {
-  return (
-            <h1 className='text-3xl font-bold text-center mt-10'>Admin Dashboard</h1>
+
+const pageTitleStyle: React.CSSProperties = {
+   fontFamily: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif',
+   fontWeight: 400,
+   fontStyle: 'normal',
+   color: 'rgb(0,0,0)',
+   fontSize: '48px',
+   lineHeight: '60px',
+};
+
+function page() {
+   return (
+      <div className="mt-10 text-center">
+         <h1 style={pageTitleStyle}>User Management</h1>
+      </div>
    )
 }
 

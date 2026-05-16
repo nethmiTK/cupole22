@@ -55,7 +55,7 @@ export default function PhotographerNavbar({ onMenuClick }: PhotographerNavbarPr
     if (pathname.includes('/admin/albums')) return 'Albums';
     if (pathname.includes('/admin/customers')) return 'Customers';
     if (pathname.includes('/admin/payments')) return 'Payments';
-    if (pathname.includes('/admin/photographers')) return 'Photographers';
+    if (pathname.includes('/admin/photographers')) return 'User Management';
     return 'Dashboard';
   };
 
@@ -73,7 +73,20 @@ export default function PhotographerNavbar({ onMenuClick }: PhotographerNavbarPr
 
         {/* Title - Hidden on mobile */}
         <div className="hidden md:block min-w-[220px]">
-          <h2 className="font-serif text-2xl" style={{ color: '#C64D92' }}>{getNavTitle()}</h2>
+          <h2
+            className="font-serif"
+            style={{
+              fontFamily: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif',
+              fontStyle: 'normal',
+              fontWeight: 400,
+              color: 'rgb(198, 77, 146)',
+              fontSize: '24px',
+              lineHeight: '32px',
+              margin: 0,
+            }}
+          >
+            {getNavTitle()}
+          </h2>
         </div>
 
         {/* Search Bar */}

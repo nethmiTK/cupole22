@@ -8,7 +8,7 @@ import {
   saveAuthSession,
 } from "@/lib/auth";
 import { useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { FaEnvelope, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
 
 export default function LoginPage() {
@@ -18,17 +18,25 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const nextPath = getSafeReturnPath(searchParams?.get('next'));
+  const [nextPath, setNextPath] = useState('/admin/dashboard');
 
   useEffect(() => {
+    // Resolve next path from URL params in client environment
+    try {
+      const sp = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      const rawNext = sp ? sp.get('next') : null;
+      setNextPath(getSafeReturnPath(rawNext));
+    } catch (e) {
+      // ignore
+    }
+
     if (isSessionValid()) {
       router.replace(nextPath);
       return;
     }
 
     setCheckingSession(false);
-  }, [nextPath, router]);
+  }, [router]);
 
  const handleLogin = async (e: React.FormEvent) => {
   e.preventDefault();
