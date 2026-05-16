@@ -3,12 +3,12 @@
 import dynamic from 'next/dynamic';
 import { useEffect, useRef, useState } from 'react';
 import { Facebook, Globe, Instagram, Linkedin, Music2, PencilLine, Trash2, Twitter, Upload, X, Youtube } from 'lucide-react';
-import { clearAuthSession, getStoredUser } from '@/lib/auth';
+import { clearAuthSession, getStoredUser, getStoredToken } from '@/lib/auth';
 
 const PaginationComponent = dynamic(() => import('@/app/Components/Pagination'), { ssr: false });
 
 type UserRow = {
-  id: number;
+  id: number | string;
   name: string;
   email: string;
   role: 'Admin' | 'Photographer' | 'Client';
@@ -214,36 +214,99 @@ export default function Page() {
     handleProfileFile(event.dataTransfer.files?.[0] ?? null);
   };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const nextUser: UserRow = {
-      id: editingUserId ?? Date.now(),
-      name: formData.fullName || 'New User',
-      email: formData.email || 'new.user@example.com',
-      role: formData.role === 'admin' ? 'Admin' : formData.role === 'client' ? 'Client' : 'Photographer',
-      contact: formData.phoneNumber || '—',
-      subscription: formData.subscriptionPlan,
-      status: formData.isActive ? 'Active' : 'Offline',
-      avatar:
-        profilePreview ||
-        formData.profileImage ||
-        'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=160&q=80',
-    };
+    // Prepare payload matching backend fields
+    const payload = {
+      fullName: formData.fullName,
+      email: formData.email,
+      phoneNumber: formData.phoneNumber,
+      bio: formData.bio,
+      role: formData.role,
+      subscriptionPlan: formData.subscriptionPlan,
+      instagram: formData.instagram,
+      facebook: formData.facebook,
+      tiktok: formData.tiktok,
+      x: formData.x,
+      youtube: formData.youtube,
+      linkedin: formData.linkedin,
+      website: formData.website,
+      profileImage: profilePreview || formData.profileImage,
+      isActive: formData.isActive,
+    } as any;
 
-    setUsers((current) => {
-      if (editingUserId === null) {
-        return [nextUser, ...current];
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000/api';
+    const token = getStoredToken();
+
+    try {
+      const res = await fetch(`${apiBase}/admin/users`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error || 'Failed to create user');
       }
 
-      return current.map((user) => (user.id === editingUserId ? nextUser : user));
-    });
+      const data = await res.json();
 
-    setIsFormOpen(false);
-    setEditingUserId(null);
-    setProfilePreview('');
-    setIsDropActive(false);
-    setFormData(initialFormState);
+      // Use the user returned from the DB so we show the saved record
+      const created = data.user;
+      const nextUser: UserRow = {
+        id: created._id ?? Date.now(),
+        name: created.name || formData.fullName || 'New User',
+        email: created.email || formData.email || 'new.user@example.com',
+        role: created.role === 'admin' ? 'Admin' : created.role === 'client' ? 'Client' : 'Photographer',
+        contact: created.phone || formData.phoneNumber || '—',
+        subscription: created.subscriptionPlan || formData.subscriptionPlan,
+        status: created.status === 'active' || formData.isActive ? 'Active' : 'Offline',
+        avatar: created.profilePic || profilePreview || formData.profileImage || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=160&q=80',
+      };
+
+      setUsers((current) => {
+        if (editingUserId === null) return [nextUser, ...current];
+        return current.map((u) => (u.id === editingUserId ? nextUser : u));
+      });
+
+      setIsFormOpen(false);
+      setEditingUserId(null);
+      setProfilePreview('');
+      setIsDropActive(false);
+      setFormData(initialFormState);
+    } catch (err) {
+      console.error('Create user failed', err);
+      // Fallback to local-only behavior
+      const nextUser: UserRow = {
+        id: editingUserId ?? Date.now(),
+        name: formData.fullName || 'New User',
+        email: formData.email || 'new.user@example.com',
+        role: formData.role === 'admin' ? 'Admin' : formData.role === 'client' ? 'Client' : 'Photographer',
+        contact: formData.phoneNumber || '—',
+        subscription: formData.subscriptionPlan,
+        status: formData.isActive ? 'Active' : 'Offline',
+        avatar: profilePreview || formData.profileImage || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=160&q=80',
+      };
+
+      setUsers((current) => {
+        if (editingUserId === null) {
+          return [nextUser, ...current];
+        }
+
+        return current.map((user) => (user.id === editingUserId ? nextUser : user));
+      });
+
+      setIsFormOpen(false);
+      setEditingUserId(null);
+      setProfilePreview('');
+      setIsDropActive(false);
+      setFormData(initialFormState);
+    }
   };
 
   const handleDeleteUser = (userId: number) => {
