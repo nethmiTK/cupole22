@@ -21,14 +21,12 @@ export default function LoginPage() {
   const [nextPath, setNextPath] = useState('/admin/dashboard');
 
   useEffect(() => {
-    // Resolve next path from URL params in client environment
-    try {
+     try {
       const sp = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
       const rawNext = sp ? sp.get('next') : null;
       setNextPath(getSafeReturnPath(rawNext));
     } catch (e) {
-      // ignore
-    }
+     }
 
     if (isSessionValid()) {
       router.replace(nextPath);
@@ -51,22 +49,19 @@ export default function LoginPage() {
   }),
 });
  
-    // ✅ token check
-    if (!data?.token) {
+     if (!data?.token) {
       throw new Error(data?.message || "Login failed");
     }
 
-    // ✅ save token
-    saveAuthSession({
+     saveAuthSession({
       token: data.token,
       expiryMs: resolveAuthExpiryMs(data, data.token),
       user: data.user,
     });
 
-    alert("Login success 🌹");
+    alert("Login success  ");
 
-    // redirect to the return URL or default dashboard
-    router.replace(nextPath);
+     router.replace(nextPath);
 
   } catch (err: any) {
     alert(err.message);
@@ -85,12 +80,10 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-rose-50 via-white to-pink-100 px-4">
-      {/* background glow */}
-      <div className="absolute w-72 h-72 bg-rose-200 rounded-full blur-3xl opacity-40 top-10 left-10"></div>
+       <div className="absolute w-72 h-72 bg-rose-200 rounded-full blur-3xl opacity-40 top-10 left-10"></div>
       <div className="absolute w-72 h-72 bg-pink-200 rounded-full blur-3xl opacity-40 bottom-10 right-10"></div>
 
-      {/* card */}
-      <div className="relative w-full max-w-md bg-white/80 backdrop-blur-xl border border-rose-100 shadow-xl rounded-3xl p-8">
+       <div className="relative w-full max-w-md bg-white/80 backdrop-blur-xl border border-rose-100 shadow-xl rounded-3xl p-8">
 
         <div className="text-center mb-6">
           <h1 className="text-3xl font-bold text-rose-500">Memo Album</h1>

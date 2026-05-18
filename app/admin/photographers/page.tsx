@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useEffect, useRef, useState } from 'react';
 import { Facebook, Globe, Instagram, Linkedin, Music2, PencilLine, Trash2, Twitter, Upload, X, Youtube } from 'lucide-react';
-import { clearAuthSession, getStoredUser, getStoredToken } from '@/lib/auth';
+import { getStoredUser, getStoredToken } from '@/lib/auth';
 
 const PaginationComponent = dynamic(() => import('@/app/Components/Pagination'), { ssr: false });
 
@@ -16,43 +16,15 @@ type UserRow = {
   subscription: string;
   status: 'Active' | 'Offline';
   avatar: string;
+  bio?: string;
+  instagram?: string;
+  facebook?: string;
+  tiktok?: string;
+  x?: string;
+  youtube?: string;
+  linkedin?: string;
+  website?: string;
 };
-
-const sampleUsers: UserRow[] = [
-  {
-    id: 1,
-    name: 'Julian Casablancas',
-    email: 'julian.c@lensflow.studio',
-    role: 'Admin',
-    contact: '+1 (555) 012-3456',
-    subscription: 'Enterprise Tier',
-    status: 'Active',
-    avatar:
-      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=160&q=80',
-  },
-  {
-    id: 2,
-    name: 'Maya Sterling',
-    email: 'maya.photo@lensflow.studio',
-    role: 'Photographer',
-    contact: '+44 7700 900077',
-    subscription: 'Pro Monthly',
-    status: 'Active',
-    avatar:
-      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=160&q=80',
-  },
-  {
-    id: 3,
-    name: 'Liam Henderson',
-    email: 'liam.h@client-domain.com',
-    role: 'Client',
-    contact: '+1 (555) 998-2211',
-    subscription: 'Standard',
-    status: 'Offline',
-    avatar:
-      'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=160&q=80',
-  },
-];
 
 const initialFormState = {
   fullName: '',
@@ -68,22 +40,20 @@ const initialFormState = {
   linkedin: '',
   website: '',
   profileImage: '',
-  role: 'photographer',
-  subscriptionPlan: 'photographer-1-year',
+  role: 'photographer' as const,
+  subscriptionPlan: 'photographer-1-year' as 'photographer-1-year' | 'client-1-year',
   isActive: true,
 };
 
 const inputClassName = 'w-full rounded-xl border border-[#F3E5E6] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#d9c8c9] focus:ring-4 focus:ring-[#f3e5e630]';
-const pageLabelStyle = {
+
+const popupSectionTitleStyle = {
   fontFamily: '"Plus Jakarta Sans", "Segoe UI", sans-serif',
   fontStyle: 'normal',
   fontWeight: 700,
   color: 'rgb(177, 14, 107)',
   fontSize: '10px',
   lineHeight: '15px',
-  margin: 0,
-  letterSpacing: '0',
-  textTransform: 'none',
 } as const;
 
 const bodyTextStyle = {
@@ -111,7 +81,6 @@ const statHeadingStyle = {
   color: 'rgb(177, 14, 107)',
   fontSize: '16px',
   lineHeight: '24px',
-  margin: 0,
 } as const;
 
 const statValueStyle = {
@@ -124,49 +93,85 @@ const statValueStyle = {
 } as const;
 
 const subscriptionPlans = [
-  {
-    value: 'photographer-1-year',
-    title: 'Photographer',
-    description: '1 year plan / Rs 5000',
-  },
-  {
-    value: 'client-1-year',
-    title: 'Client',
-    description: '1 year plan / Rs 5000',
-  },
+  { value: 'photographer-1-year', title: 'Photographer', description: '1 year plan / Rs 5000' },
+  { value: 'client-1-year', title: 'Client', description: '1 year plan / Rs 5000' },
 ] as const;
 
-export default function Page() {
+export default function UserManagementPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [users, setUsers] = useState(sampleUsers);
+  const [users, setUsers] = useState<UserRow[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [editingUserId, setEditingUserId] = useState<number | null>(null);
+  const [editingUserId, setEditingUserId] = useState<number | string | null>(null);
   const [profilePreview, setProfilePreview] = useState('');
   const [isDropActive, setIsDropActive] = useState(false);
   const [creatorName, setCreatorName] = useState('Current admin session');
   const [formData, setFormData] = useState(initialFormState);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [loading, setLoading] = useState(false);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000/api';
+
+  const normalizeUser = (user: any): UserRow => ({
+    id: user.id || user._id,
+    name: user.name || user.fullName || '',
+    email: user.email || '',
+    role: (user.role || 'client').charAt(0).toUpperCase() + (user.role || 'client').slice(1),
+    contact: user.contact || user.phone || user.phoneNumber || '',
+    subscription: user.subscription || user.subscriptionPlan || '',
+    status: user.status === 'active' || user.isActive ? 'Active' : 'Offline',
+    avatar: user.avatar || user.profilePic || '',
+    bio: user.bio || '',
+    instagram: user.instagram || user.socials?.instagram || '',
+    facebook: user.facebook || user.socials?.facebook || '',
+    tiktok: user.tiktok || user.socials?.tiktok || '',
+    x: user.x || user.socials?.x || '',
+    youtube: user.youtube || user.socials?.youtube || '',
+    linkedin: user.linkedin || user.socials?.linkedin || '',
+    website: user.website || user.socials?.website || '',
+  });
+
+  // Prevent background scroll
   useEffect(() => {
     document.body.style.overflow = isFormOpen ? 'hidden' : '';
-    return () => {
-      document.body.style.overflow = '';
-    };
+    return () => { document.body.style.overflow = ''; };
   }, [isFormOpen]);
 
+  // Load creator name
   useEffect(() => {
-    const storedUser = getStoredUser() as { name?: string; fullName?: string; username?: string; email?: string } | null;
-    const displayName = storedUser?.name || storedUser?.fullName || storedUser?.username || storedUser?.email;
-    if (displayName) {
-      setCreatorName(displayName);
-    }
+    const storedUser = getStoredUser() as any;
+    const displayName = storedUser?.name || storedUser?.fullName || storedUser?.email;
+    if (displayName) setCreatorName(displayName);
   }, []);
 
+  useEffect(() => {
+    const loadUsers = async () => {
+      const token = getStoredToken();
+      if (!token) return;
+
+      try {
+        const res = await fetch(`${apiBase}/admin/users`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.message || 'Failed to load users');
+        }
+
+        setUsers((Array.isArray(data.users) ? data.users : []).map(normalizeUser));
+      } catch (error) {
+        console.error('❌ Load Users Error:', error);
+      }
+    };
+
+    loadUsers();
+  }, [apiBase]);
+
   const updateField = (field: keyof typeof initialFormState, value: string | boolean) => {
-    setFormData((current) => ({
-      ...current,
-      [field]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const openCreateForm = () => {
@@ -184,139 +189,131 @@ export default function Page() {
       fullName: user.name,
       email: user.email,
       phoneNumber: user.contact,
-      role: user.role.toLowerCase() as typeof initialFormState.role,
-      subscriptionPlan: user.subscription,
+      bio: user.bio || '',
+      role: user.role.toLowerCase() as any,
+      subscriptionPlan: user.subscription.toLowerCase().includes('photographer') 
+        ? 'photographer-1-year' 
+        : 'client-1-year',
       profileImage: user.avatar,
+      instagram: user.instagram || '',
+      facebook: user.facebook || '',
+      tiktok: user.tiktok || '',
+      x: user.x || '',
+      youtube: user.youtube || '',
+      linkedin: user.linkedin || '',
+      website: user.website || '',
     });
     setIsFormOpen(true);
   };
 
   const closeForm = () => {
     setIsFormOpen(false);
+    setEditingUserId(null);
+    setProfilePreview('');
     setIsDropActive(false);
   };
 
   const handleProfileFile = (file: File | null) => {
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = () => {
-      const result = typeof reader.result === 'string' ? reader.result : '';
-      setProfilePreview(result);
-      updateField('profileImage', result);
+      if (typeof reader.result === 'string') {
+        setProfilePreview(reader.result);
+        updateField('profileImage', reader.result);
+      }
     };
     reader.readAsDataURL(file);
   };
+  // ==================== SUBMIT TO BACKEND ====================
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  e.preventDefault();
+  setLoading(true);
 
-  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    setIsDropActive(false);
-    handleProfileFile(event.dataTransfer.files?.[0] ?? null);
+  const token = getStoredToken();
+
+  console.log("🔑 Token:", token ? "Exists" : "Missing");
+  console.log("🌐 API URL:", `${apiBase}/admin/users`);
+
+  if (!token) {
+    alert("No token found. Please login again.");
+    setLoading(false);
+    return;
+  }
+
+  const payload = {
+    fullName: formData.fullName,
+    email: formData.email,
+    password: formData.password,
+    phoneNumber: formData.phoneNumber,
+    bio: formData.bio,
+    role: formData.role,
+    subscriptionPlan: formData.subscriptionPlan,
+    instagram: formData.instagram,
+    facebook: formData.facebook,
+    tiktok: formData.tiktok,
+    x: formData.x,
+    youtube: formData.youtube,
+    linkedin: formData.linkedin,
+    website: formData.website,
+    profileImage: profilePreview || formData.profileImage,
+    isActive: formData.isActive,
   };
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  console.log("📦 Payload being sent:", payload);
 
-    // Prepare payload matching backend fields
-    const payload = {
-      fullName: formData.fullName,
-      email: formData.email,
-      phoneNumber: formData.phoneNumber,
-      bio: formData.bio,
-      role: formData.role,
-      subscriptionPlan: formData.subscriptionPlan,
-      instagram: formData.instagram,
-      facebook: formData.facebook,
-      tiktok: formData.tiktok,
-      x: formData.x,
-      youtube: formData.youtube,
-      linkedin: formData.linkedin,
-      website: formData.website,
-      profileImage: profilePreview || formData.profileImage,
-      isActive: formData.isActive,
-    } as any;
+  try {
+    const res = await fetch(`${apiBase}/admin/users`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
 
-    const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000/api';
-    const token = getStoredToken();
+    console.log("📡 Response Status:", res.status);
 
-    try {
-      const res = await fetch(`${apiBase}/admin/users`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(payload),
-      });
+    const responseData = await res.json();
+    console.log("📥 Response Body:", responseData);
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.error || 'Failed to create user');
+    if (!res.ok) {
+      throw new Error(responseData.message || `Error ${res.status}`);
+    }
+
+    // Success
+    const savedUser = normalizeUser(responseData.user || responseData);
+
+    setUsers((prev) => {
+      const existingIndex = prev.findIndex((user) => user.id === savedUser.id);
+      if (existingIndex >= 0) {
+        const next = [...prev];
+        next[existingIndex] = savedUser;
+        return next;
       }
 
-      const data = await res.json();
+      return [savedUser, ...prev];
+    });
 
-      // Use the user returned from the DB so we show the saved record
-      const created = data.user;
-      const nextUser: UserRow = {
-        id: created._id ?? Date.now(),
-        name: created.name || formData.fullName || 'New User',
-        email: created.email || formData.email || 'new.user@example.com',
-        role: created.role === 'admin' ? 'Admin' : created.role === 'client' ? 'Client' : 'Photographer',
-        contact: created.phone || formData.phoneNumber || '—',
-        subscription: created.subscriptionPlan || formData.subscriptionPlan,
-        status: created.status === 'active' || formData.isActive ? 'Active' : 'Offline',
-        avatar: created.profilePic || profilePreview || formData.profileImage || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=160&q=80',
-      };
+    alert("✅ User created successfully!");
+    closeForm();
 
-      setUsers((current) => {
-        if (editingUserId === null) return [nextUser, ...current];
-        return current.map((u) => (u.id === editingUserId ? nextUser : u));
-      });
+  } catch (error: any) {
+    console.error("❌ Save Error:", error);
+    alert(error.message || "Failed to save user");
+  } finally {
+    setLoading(false);
+  }
+};
 
-      setIsFormOpen(false);
-      setEditingUserId(null);
-      setProfilePreview('');
-      setIsDropActive(false);
-      setFormData(initialFormState);
-    } catch (err) {
-      console.error('Create user failed', err);
-      // Fallback to local-only behavior
-      const nextUser: UserRow = {
-        id: editingUserId ?? Date.now(),
-        name: formData.fullName || 'New User',
-        email: formData.email || 'new.user@example.com',
-        role: formData.role === 'admin' ? 'Admin' : formData.role === 'client' ? 'Client' : 'Photographer',
-        contact: formData.phoneNumber || '—',
-        subscription: formData.subscriptionPlan,
-        status: formData.isActive ? 'Active' : 'Offline',
-        avatar: profilePreview || formData.profileImage || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=160&q=80',
-      };
-
-      setUsers((current) => {
-        if (editingUserId === null) {
-          return [nextUser, ...current];
-        }
-
-        return current.map((user) => (user.id === editingUserId ? nextUser : user));
-      });
-
-      setIsFormOpen(false);
-      setEditingUserId(null);
-      setProfilePreview('');
-      setIsDropActive(false);
-      setFormData(initialFormState);
+  const handleDeleteUser = (userId: number | string) => {
+    if (confirm('Are you sure you want to delete this user?')) {
+      setUsers(prev => prev.filter(user => user.id !== userId));
     }
   };
 
-  const handleDeleteUser = (userId: number) => {
-    setUsers((current) => current.filter((user) => user.id !== userId));
-  };
-
   const visibleUsers = users.filter((user) => {
-    const query = searchTerm.trim().toLowerCase();
+    const query = searchTerm.toLowerCase().trim();
     if (!query) return true;
-
     return [user.name, user.email, user.role, user.contact, user.subscription, user.status]
       .join(' ')
       .toLowerCase()
@@ -325,127 +322,95 @@ export default function Page() {
 
   return (
     <section className="min-h-[calc(100vh-72px)] bg-[#FFF8F7] px-4 py-6 text-[#111111] md:px-6 md:py-8">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+      <div className="mx-auto max-w-7xl flex flex-col gap-6">
+        {/* Header */}
         <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p style={pageLabelStyle}>Invite Flow</p>
-            <h1
-              className="mt-2 tracking-normal"
-              style={{
-                fontFamily: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif',
-                fontStyle: 'normal',
-                fontWeight: 400,
-                color: 'rgb(0, 0, 0)',
-                fontSize: '48px',
-                lineHeight: '60px',
-              }}
-            >
+            <p style={popupSectionTitleStyle}>Invite Flow</p>
+            <h1 className="mt-2 text-5xl" style={{ fontFamily: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif', fontWeight: 400 }}>
               User Management
             </h1>
-            <p className="mt-1 max-w-2xl text-sm text-[#6f5b5c] md:text-base" style={bodyTextStyle}>
+            <p className="mt-1 max-w-2xl text-[#6f5b5c]" style={bodyTextStyle}>
               Manage your studio team, photographers, and client access levels.
             </p>
           </div>
 
           <button
-            type="button"
             onClick={openCreateForm}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#BC116E] px-5 py-3 shadow-[0_12px_28px_rgba(18,18,18,0.08)] transition-transform hover:scale-[1.01] active:scale-[0.99]"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#BC116E] px-6 py-3 shadow-lg transition hover:scale-105 active:scale-95"
             style={actionButtonTextStyle}
           >
-            <span className="text-lg leading-none">+</span>
-            Add User
+            <span className="text-xl leading-none">+</span> Add User
           </button>
- 
         </header>
 
+        {/* Stats */}
         <div className="grid gap-4 md:grid-cols-4">
           <StatCard title="Total Users" value="1,284" meta="+12%" />
           <StatCard title="Active Now" value="412" meta="Live" />
           <StatCard title="Photographers" value="86" meta="/ 100 slots" />
-          <div className="rounded-3xl bg-[#F3E5E6] p-5 text-black shadow-[0_12px_32px_rgba(18,18,18,0.08)]">
+          <div className="rounded-3xl bg-[#F3E5E6] p-5 shadow-lg">
             <p style={statHeadingStyle}>Pro Plan Usage</p>
-            <div className="mt-2" style={statValueStyle}>92% Capacity</div>
-            <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-black/10">
-              <div className="h-full w-[92%] rounded-full bg-black" />
+            <div className="mt-2 text-3xl font-light" style={statValueStyle}>92% Capacity</div>
+            <div className="mt-4 h-1.5 bg-black/10 rounded-full overflow-hidden">
+              <div className="h-full w-[92%] bg-black rounded-full" />
             </div>
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-3xl border border-[#F3E5E6] bg-white shadow-[0_10px_30px_rgba(18,18,18,0.05)]">
+        {/* Table */}
+        <div className="overflow-hidden rounded-3xl border border-[#F3E5E6] bg-white shadow-xl">
           <div className="flex flex-col gap-4 border-b border-[#F3E5E6] px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="relative w-full max-w-md">
-              <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-[#6f5b5c]">⌕</span>
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#6f5b5c]">⌕</span>
               <input
-                className="w-full rounded-full border border-[#F3E5E6] bg-[#FFF8F7] py-3 pl-11 pr-4 text-sm outline-none transition focus:border-[#d9c8c9] focus:ring-4 focus:ring-[#f3e5e630]"
-                placeholder="Filter by name, role or email..."
                 type="text"
+                placeholder="Filter by name, role or email..."
                 value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full rounded-full border border-[#F3E5E6] bg-[#FFF8F7] py-3 pl-11 pr-4 text-sm focus:border-[#d9c8c9] focus:ring-4 focus:ring-[#f3e5e630]"
               />
             </div>
 
-            <button
-              type="button"
-              onClick={openCreateForm}
-              className="rounded-xl bg-[#BC116E] px-4 py-3 transition hover:bg-[#9e0e5d]"
-              style={actionButtonTextStyle}
-            >
+            <button onClick={openCreateForm} className="rounded-xl bg-[#BC116E] px-5 py-3 transition hover:bg-[#9e0e5d]" style={actionButtonTextStyle}>
               Add User
             </button>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left" style={{ minWidth: 860 }}>
+            <table className="w-full border-collapse text-left" style={{ minWidth: '860px' }}>
               <thead className="bg-[#FFF8F7]">
                 <tr>
-                  <th className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.24em] text-[#6f5b5c]">Full Name</th>
-                  <th className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.24em] text-[#6f5b5c]">Role</th>
-                  <th className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.24em] text-[#6f5b5c]">Contact</th>
-                  <th className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.24em] text-[#6f5b5c]">Subscription</th>
-                  <th className="px-5 py-4 text-center text-xs font-semibold uppercase tracking-[0.24em] text-[#6f5b5c]">Status</th>
-                  <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-[0.24em] text-[#6f5b5c]">Actions</th>
+                  <th className="px-5 py-4 text-xs font-semibold uppercase tracking-widest text-[#6f5b5c]">Full Name</th>
+                  <th className="px-5 py-4 text-xs font-semibold uppercase tracking-widest text-[#6f5b5c]">Role</th>
+                  <th className="px-5 py-4 text-xs font-semibold uppercase tracking-widest text-[#6f5b5c]">Contact</th>
+                  <th className="px-5 py-4 text-xs font-semibold uppercase tracking-widest text-[#6f5b5c]">Subscription</th>
+                  <th className="px-5 py-4 text-center text-xs font-semibold uppercase tracking-widest text-[#6f5b5c]">Status</th>
+                  <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-widest text-[#6f5b5c]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F3E5E6]">
                 {visibleUsers.map((user) => (
-                  <tr key={user.email} className="transition hover:bg-[#FFF8F7]">
+                  <tr key={user.id} className="hover:bg-[#FFF8F7] transition">
                     <td className="px-5 py-5">
                       <div className="flex items-center gap-3">
-                        <img alt={user.name} className="h-10 w-10 rounded-full object-cover ring-2 ring-white" src={user.avatar} />
+                        <img src={user.avatar} alt={user.name} className="h-10 w-10 rounded-full object-cover ring-2 ring-white" />
                         <div>
-                          <p className="text-sm font-semibold text-black">{user.name}</p>
+                          <p className="font-semibold">{user.name}</p>
                           <p className="text-sm text-[#6f5b5c]">{user.email}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-5">
-                      <RoleBadge role={user.role} />
-                    </td>
+                    <td className="px-5 py-5"><RoleBadge role={user.role} /></td>
                     <td className="px-5 py-5 text-sm text-[#6f5b5c]">{user.contact}</td>
+                    <td className="px-5 py-5"><p className="font-semibold">{user.subscription}</p></td>
+                    <td className="px-5 py-5 text-center"><StatusBadge status={user.status} /></td>
                     <td className="px-5 py-5">
-                      <p className="text-sm font-semibold text-black">{user.subscription}</p>
-                      <p className="text-sm text-[#6f5b5c]">Renewal details</p>
-                    </td>
-                    <td className="px-5 py-5 text-center">
-                      <StatusBadge status={user.status} />
-                    </td>
-                    <td className="px-5 py-5">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openEditForm(user)}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#F3E5E6] bg-white text-[#BC116E] transition hover:bg-[#FFF8F7]"
-                          aria-label={`Edit ${user.name}`}
-                        >
+                      <div className="flex justify-end gap-2">
+                        <button onClick={() => openEditForm(user)} className="h-9 w-9 flex items-center justify-center rounded-full border border-[#F3E5E6] hover:bg-[#FFF8F7] text-[#BC116E]">
                           <PencilLine size={16} />
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteUser(user.id)}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#F3E5E6] bg-white text-[#BC116E] transition hover:bg-[#FFF8F7]"
-                          aria-label={`Delete ${user.name}`}
-                        >
+                        <button onClick={() => handleDeleteUser(user.id)} className="h-9 w-9 flex items-center justify-center rounded-full border border-[#F3E5E6] hover:bg-[#FFF8F7] text-[#BC116E]">
                           <Trash2 size={16} />
                         </button>
                       </div>
@@ -456,66 +421,53 @@ export default function Page() {
             </table>
           </div>
 
-          <PaginationComponent/>
+          <PaginationComponent />
         </div>
- 
       </div>
 
-      {isFormOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-6 backdrop-blur-md">
-          <div
-            className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-[1.75rem] border border-[#F3E5E6] bg-white shadow-[0_24px_80px_rgba(18,18,18,0.18)] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-            style={bodyTextStyle}
-          >
-            <div className="flex items-start justify-between gap-4 border-b border-[#F3E5E6] px-6 py-5">
+      {/* ====================== CREATE / EDIT FORM ====================== */}
+      {isFormOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-md px-4 py-6">
+          <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-[28px] border border-[#F3E5E6] bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-[#F3E5E6] px-6 py-5">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em]" style={{ color: '#BC116E' }}>
-                  Popup form
-                </p>
-                <h2 className="mt-2 text-2xl font-semibold text-black" style={bodyTextStyle}>
-                  {editingUserId === null ? 'Create User' : 'Edit User'}
+                <p className="text-xs font-semibold uppercase tracking-widest text-[#BC116E]">User Form</p>
+                <h2 className="mt-1 text-2xl font-semibold">
+                  {editingUserId === null ? 'Create New User' : 'Edit User'}
                 </h2>
-                <p className="mt-1 text-sm text-[#6f5b5c]" style={bodyTextStyle}>
-                  Fill in the account details and create the profile.
-                </p>
               </div>
-              <button
-                type="button"
-                onClick={closeForm}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#BC116E] transition hover:bg-[#9e0e5d]"
-                aria-label="Close popup"
-                style={actionButtonTextStyle}
-              >
-                <X size={18} />
+              <button onClick={closeForm} className="h-10 w-10 flex items-center justify-center bg-[#BC116E] text-white rounded-full hover:bg-[#9e0e5d]">
+                <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6 px-6 py-6">
-              <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-                <div className="space-y-6">
+            <form onSubmit={handleSubmit} className="p-6 space-y-8">
+              <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
+                {/* Left Column - Profile & Social */}
+                <div className="space-y-8">
                   <SectionCard title="Profile Info" titleStyle={popupSectionTitleStyle}>
                     <div className="grid gap-4 md:grid-cols-2">
                       <Field label="Full Name">
-                        <input value={formData.fullName} onChange={(event) => updateField('fullName', event.target.value)} className={inputClassName} placeholder="e.g. Sarah Jenkins" />
+                        <input value={formData.fullName} onChange={(e) => updateField('fullName', e.target.value)} className={inputClassName} required />
                       </Field>
                       <Field label="Email Address">
-                        <input value={formData.email} onChange={(event) => updateField('email', event.target.value)} className={inputClassName} placeholder="sarah@example.com" type="email" />
+                        <input type="email" value={formData.email} onChange={(e) => updateField('email', e.target.value)} className={inputClassName} required />
                       </Field>
                       <Field label="Password">
-                        <input value={formData.password} onChange={(event) => updateField('password', event.target.value)} className={inputClassName} placeholder="••••••••" type="password" />
+                        <input type="password" value={formData.password} onChange={(e) => updateField('password', e.target.value)} className={inputClassName} />
                       </Field>
                       <Field label="Phone Number">
-                        <input value={formData.phoneNumber} onChange={(event) => updateField('phoneNumber', event.target.value)} className={inputClassName} placeholder="+1 (555) 000-0000" type="tel" />
+                        <input type="tel" value={formData.phoneNumber} onChange={(e) => updateField('phoneNumber', e.target.value)} className={inputClassName} />
                       </Field>
                       <Field label="Role">
-                        <select value={formData.role} onChange={(event) => updateField('role', event.target.value)} className={inputClassName}>
+                        <select value={formData.role} onChange={(e) => updateField('role', e.target.value)} className={inputClassName} required>
                           <option value="admin">Admin</option>
                           <option value="photographer">Photographer</option>
                           <option value="client">Client</option>
                         </select>
                       </Field>
                       <Field label="Bio" className="md:col-span-2">
-                        <textarea value={formData.bio} onChange={(event) => updateField('bio', event.target.value)} className={`${inputClassName} min-h-32`} placeholder="Tell us about the user's specialty and experience..." rows={4} />
+                        <textarea value={formData.bio} onChange={(e) => updateField('bio', e.target.value)} className={`${inputClassName} min-h-32`} rows={4} />
                       </Field>
                     </div>
                   </SectionCard>
@@ -523,211 +475,117 @@ export default function Page() {
                   <SectionCard title="Social Links" titleStyle={popupSectionTitleStyle}>
                     <div className="grid gap-4 md:grid-cols-2">
                       <Field label={<SocialLabel icon={<Instagram size={16} />} text="Instagram" />}>
-                        <input value={formData.instagram} onChange={(event) => updateField('instagram', event.target.value)} className={inputClassName} placeholder="instagram.com/username" />
+                        <input value={formData.instagram} onChange={(e) => updateField('instagram', e.target.value)} className={inputClassName} placeholder="username" />
                       </Field>
                       <Field label={<SocialLabel icon={<Facebook size={16} />} text="Facebook" />}>
-                        <input value={formData.facebook} onChange={(event) => updateField('facebook', event.target.value)} className={inputClassName} placeholder="facebook.com/username" />
+                        <input value={formData.facebook} onChange={(e) => updateField('facebook', e.target.value)} className={inputClassName} placeholder="profile url" />
                       </Field>
                       <Field label={<SocialLabel icon={<Music2 size={16} />} text="TikTok" />}>
-                        <input value={formData.tiktok} onChange={(event) => updateField('tiktok', event.target.value)} className={inputClassName} placeholder="tiktok.com/@username" />
+                        <input value={formData.tiktok} onChange={(e) => updateField('tiktok', e.target.value)} className={inputClassName} placeholder="handle or url" />
                       </Field>
-                      <Field label={<SocialLabel icon={<Twitter size={16} />} text="X (Twitter)" />}>
-                        <input value={formData.x} onChange={(event) => updateField('x', event.target.value)} className={inputClassName} placeholder="x.com/username" />
+                      <Field label={<SocialLabel icon={<Twitter size={16} />} text="X / Twitter" />}>
+                        <input value={formData.x} onChange={(e) => updateField('x', e.target.value)} className={inputClassName} placeholder="handle or url" />
                       </Field>
                       <Field label={<SocialLabel icon={<Youtube size={16} />} text="YouTube" />}>
-                        <input value={formData.youtube} onChange={(event) => updateField('youtube', event.target.value)} className={inputClassName} placeholder="youtube.com/@channel" />
+                        <input value={formData.youtube} onChange={(e) => updateField('youtube', e.target.value)} className={inputClassName} placeholder="channel url" />
                       </Field>
                       <Field label={<SocialLabel icon={<Linkedin size={16} />} text="LinkedIn" />}>
-                        <input value={formData.linkedin} onChange={(event) => updateField('linkedin', event.target.value)} className={inputClassName} placeholder="linkedin.com/in/username" />
+                        <input value={formData.linkedin} onChange={(e) => updateField('linkedin', e.target.value)} className={inputClassName} placeholder="profile url" />
                       </Field>
                       <Field label={<SocialLabel icon={<Globe size={16} />} text="Website" />} className="md:col-span-2">
-                        <input value={formData.website} onChange={(event) => updateField('website', event.target.value)} className={inputClassName} placeholder="yourwebsite.com" />
+                        <input value={formData.website} onChange={(e) => updateField('website', e.target.value)} className={inputClassName} />
                       </Field>
                     </div>
                   </SectionCard>
                 </div>
 
-                <div className="space-y-6">
+                {/* Right Column */}
+                <div className="space-y-8">
                   <SectionCard title="Subscription Plan" titleStyle={popupSectionTitleStyle}>
                     <div className="space-y-3">
                       {subscriptionPlans.map((plan) => (
-                        <PlanCard
-                          key={plan.value}
-                          active={formData.subscriptionPlan === plan.value}
-                          description={plan.description}
-                          title={plan.title}
-                          onClick={() => updateField('subscriptionPlan', plan.value)}
-                        />
+                        <PlanCard key={plan.value} {...plan} active={formData.subscriptionPlan === plan.value} onClick={() => updateField('subscriptionPlan', plan.value)} />
                       ))}
                     </div>
                   </SectionCard>
 
                   <SectionCard title="Account Status" titleStyle={popupSectionTitleStyle}>
-                    <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-[#F3E5E6] px-4 py-4 transition hover:bg-[#FFF8F7]">
+                    <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-[#F3E5E6] p-4 hover:bg-[#FFF8F7]">
                       <div>
-                        <p className="text-sm font-semibold text-black">Active account</p>
-                        <p className="mt-1 text-sm text-[#6f5b5c]">Allow the user to sign in immediately.</p>
+                        <p className="font-semibold">Active Account</p>
+                        <p className="text-sm text-[#6f5b5c]">Allow user to sign in</p>
                       </div>
-                      <input
-                        checked={formData.isActive}
-                        onChange={(event) => updateField('isActive', event.target.checked)}
-                        className="h-5 w-5 rounded border-[#F3E5E6] text-[#BC116E] focus:ring-[#BC116E]"
-                        type="checkbox"
-                      />
+                      <input type="checkbox" checked={formData.isActive} onChange={(e) => updateField('isActive', e.target.checked)} className="h-5 w-5 text-[#BC116E]" />
                     </label>
-
-                    <div className="mt-4 rounded-2xl bg-[#FFF8F7] p-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#6f5b5c]">Created by</p>
-                      <p className="mt-2 text-sm text-black">{creatorName}</p>
-                    </div>
                   </SectionCard>
 
                   <SectionCard title="Profile Picture" titleStyle={popupSectionTitleStyle}>
-                    <div
-                      onDragLeave={() => setIsDropActive(false)}
-                      onDragOver={(event) => {
-                        event.preventDefault();
-                        setIsDropActive(true);
-                      }}
-                      onDrop={handleDrop}
-                      className={`flex min-h-52 cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed px-4 text-center transition ${
-                        isDropActive ? 'border-[#BC116E] bg-[#FFF3FA]' : 'border-[#F3E5E6] bg-[#FFF8F7]'
-                      }`}
-                      onClick={() => fileInputRef.current?.click()}
-                    >
+                    <div onDragOver={(e) => { e.preventDefault(); setIsDropActive(true); }} onDragLeave={() => setIsDropActive(false)} onDrop={(e) => { e.preventDefault(); setIsDropActive(false); handleProfileFile(e.dataTransfer.files[0]); }} onClick={() => fileInputRef.current?.click()} className={`min-h-52 flex flex-col items-center justify-center rounded-3xl border-2 border-dashed cursor-pointer transition ${isDropActive ? 'border-[#BC116E] bg-[#FFF3FA]' : 'border-[#F3E5E6] bg-[#FFF8F7]'}`}>
                       {profilePreview ? (
-                        <img alt="Profile preview" className="h-28 w-28 rounded-full object-cover ring-4 ring-white shadow-sm" src={profilePreview} />
+                        <img src={profilePreview} alt="Preview" className="h-28 w-28 rounded-full object-cover ring-4 ring-white" />
                       ) : (
-                        <div className="flex h-24 w-24 items-center justify-center rounded-full border border-[#F3E5E6] bg-white text-[#BC116E] shadow-sm">
-                          <Upload size={28} />
+                        <div className="h-24 w-24 rounded-full border border-[#F3E5E6] bg-white flex items-center justify-center text-[#BC116E]">
+                          <Upload size={32} />
                         </div>
                       )}
-                      <p className="mt-4 text-sm font-semibold text-black">Drop profile pic or browse</p>
-                      <p className="mt-1 text-sm text-[#6f5b5c]">JPG, PNG, or GIF up to 5MB</p>
-                      <input
-                        ref={fileInputRef}
-                        accept="image/*"
-                        className="hidden"
-                        type="file"
-                        onChange={(event) => handleProfileFile(event.target.files?.[0] ?? null)}
-                      />
+                      <p className="mt-4 font-semibold">Drop or click to upload</p>
+                      <p className="text-sm text-[#6f5b5c]">JPG, PNG, GIF (Max 5MB)</p>
+                      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleProfileFile(e.target.files?.[0] ?? null)} />
                     </div>
                   </SectionCard>
                 </div>
               </div>
 
-              <div className="flex flex-col-reverse gap-3 border-t border-[#F3E5E6] pt-5 sm:flex-row sm:items-center sm:justify-end">
-                <button
-                  type="button"
-                  onClick={closeForm}
-                  className="rounded-xl px-5 py-3 transition hover:bg-[#FFF8F7]"
-                  style={{ ...bodyTextStyle, fontWeight: 600 }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-xl bg-[#BC116E] px-6 py-3 shadow-[0_12px_28px_rgba(18,18,18,0.08)] transition-transform hover:scale-[1.01] active:scale-[0.99]"
-                  style={actionButtonTextStyle}
-                >
-                  Create User
+              <div className="flex flex-col-reverse sm:flex-row gap-3 pt-6 border-t border-[#F3E5E6]">
+                <button type="button" onClick={closeForm} className="px-6 py-3 rounded-xl hover:bg-[#FFF8F7] font-semibold">Cancel</button>
+                <button type="submit" disabled={loading} className="px-8 py-3 rounded-xl bg-[#BC116E] text-white font-semibold hover:scale-105 active:scale-95 transition disabled:opacity-70" style={actionButtonTextStyle}>
+                  {loading ? 'Saving...' : editingUserId === null ? 'Create User' : 'Save Changes'}
                 </button>
               </div>
             </form>
           </div>
         </div>
-      ) : null}
+      )}
     </section>
   );
 }
 
-function StatCard({ title, value, meta }: { title: string; value: string; meta: string }) {
+ function StatCard({ title, value, meta }: { title: string; value: string; meta: string }) {
   return (
-    <div className="rounded-3xl border border-[#F3E5E6] bg-white p-5 shadow-[0_10px_30px_rgba(18,18,18,0.05)]">
+    <div className="rounded-3xl border border-[#F3E5E6] bg-white p-5 shadow">
       <p style={statHeadingStyle}>{title}</p>
       <div className="mt-3 flex items-end gap-2">
         <span style={statValueStyle}>{value}</span>
-        <span className="pb-1 text-sm font-semibold text-[#6f5b5c]" style={{ fontFamily: '"Plus Jakarta Sans", "Segoe UI", sans-serif', fontWeight: 400 }}>
-          {meta}
-        </span>
+        <span className="pb-1 text-sm text-[#6f5b5c]">{meta}</span>
       </div>
     </div>
   );
 }
 
 function RoleBadge({ role }: { role: UserRow['role'] }) {
-  const classes = {
-    Admin: 'border-[#F3E5E6] bg-[#FFF8F7] text-black',
-    Photographer: 'border-[#F3E5E6] bg-[#FFF8F7] text-black',
-    Client: 'border-[#F3E5E6] bg-[#FFF8F7] text-black',
-  } as const;
-
-  return <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${classes[role]}`}>{role}</span>;
+  return <span className="inline-flex rounded-full border border-[#F3E5E6] bg-[#FFF8F7] px-3 py-1 text-xs font-semibold">{role}</span>;
 }
 
 function StatusBadge({ status }: { status: UserRow['status'] }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-[#F3E5E6] bg-[#FFF8F7] px-3 py-1 text-xs font-semibold text-black">
-      <span className="h-1.5 w-1.5 rounded-full bg-black" />
-      {status}
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#F3E5E6] bg-[#FFF8F7] px-3 py-1 text-xs font-semibold">
+      <span className="h-2 w-2 rounded-full bg-emerald-500" />{status}
     </span>
   );
 }
 
-function PageChip({ label, active = false }: { label: string; active?: boolean }) {
+function SectionCard({ title, children, titleStyle }: { title: string; children: React.ReactNode; titleStyle?: React.CSSProperties }) {
   return (
-    <button
-      type="button"
-      className={`flex h-8 w-8 items-center justify-center rounded-lg text-sm font-semibold transition ${
-        active ? 'bg-[#F3E5E6] text-black' : 'border border-[#F3E5E6] bg-white text-[#6f5b5c] hover:bg-[#FFF8F7]'
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
-
-function SectionCard({
-  title,
-  children,
-  titleClassName = 'text-black',
-  titleStyle,
-}: {
-  title: string;
-  children: React.ReactNode;
-  titleClassName?: string;
-  titleStyle?: React.CSSProperties;
-}) {
-  return (
-    <div className="rounded-[1.35rem] border border-[#F3E5E6] bg-[#fffdfd] p-5">
-      <h3 className={`text-lg font-semibold ${titleClassName}`} style={titleStyle}>
-        {title}
-      </h3>
-      <div className="mt-4">{children}</div>
+    <div className="rounded-[22px] border border-[#F3E5E6] bg-[#fffdfd] p-6">
+      <h3 className="text-lg font-semibold" style={titleStyle}>{title}</h3>
+      <div className="mt-5">{children}</div>
     </div>
   );
 }
 
-const popupSectionTitleStyle = {
-  fontFamily: '"Plus Jakarta Sans", "Segoe UI", sans-serif',
-  fontStyle: 'normal',
-  fontWeight: 700,
-  color: 'rgb(177, 14, 107)',
-  fontSize: '10px',
-  lineHeight: '15px',
-} as const;
-
-function Field({
-  label,
-  children,
-  className = '',
-}: {
-  label: React.ReactNode;
-  children: React.ReactNode;
-  className?: string;
-}) {
+function Field({ label, children, className = '' }: { label: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
-    <label className={`space-y-2 ${className}`}>
+    <label className={`block space-y-2 ${className}`}>
       <span className="text-sm font-semibold text-black">{label}</span>
       {children}
     </label>
@@ -738,36 +596,22 @@ function SocialLabel({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
     <span className="flex items-center gap-2">
       <span className="text-[#BC116E]">{icon}</span>
-      <span>{text}</span>
+      {text}
     </span>
   );
 }
 
-function PlanCard({
-  title,
-  description,
-  active,
-  onClick,
-}: {
-  title: string;
-  description: string;
-  active: boolean;
-  onClick: () => void;
-}) {
+function PlanCard({ title, description, active, onClick }: { title: string; description: string; active: boolean; onClick: () => void }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
-        active ? 'border-[#F3E5E6] bg-white' : 'border-[#F3E5E6] bg-white hover:border-[#e7c6d4]'
-      }`}
-    >
-      <div className="flex items-start justify-between gap-3">
+    <button type="button" onClick={onClick} className={`w-full rounded-2xl border p-4 text-left transition-all ${active ? 'border-[#BC116E] bg-white shadow-sm' : 'border-[#F3E5E6] hover:border-[#e7c6d4]'}`}>
+      <div className="flex justify-between items-start">
         <div>
-          <p className="text-sm font-semibold text-black">{title}</p>
-          <p className="mt-1 text-sm text-[#6f5b5c]">{description}</p>
+          <p className="font-semibold">{title}</p>
+          <p className="text-sm text-[#6f5b5c]">{description}</p>
         </div>
-        <div className={`mt-1 h-4 w-4 rounded-full border ${active ? 'border-[#BC116E] bg-[#BC116E]' : 'border-[#d9c8c9] bg-white'}`} />
+        <div className={`mt-1 h-5 w-5 rounded-full border-2 flex items-center justify-center ${active ? 'border-[#BC116E] bg-[#BC116E]' : 'border-gray-300'}`}>
+          {active && <div className="h-2.5 w-2.5 bg-white rounded-full" />}
+        </div>
       </div>
     </button>
   );
