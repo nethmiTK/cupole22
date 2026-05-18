@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useEffect, useRef, useState } from 'react';
-import { Facebook, Globe, Instagram, Linkedin, Music2, PencilLine, Trash2, Twitter, Upload, X, Youtube } from 'lucide-react';
+import { Eye, EyeOff, Facebook, Globe, Instagram, KeyRound, Linkedin, Mail, Music2, PencilLine, Trash2, Twitter, Upload, X, Youtube } from 'lucide-react';
 import { getStoredUser, getStoredToken } from '@/lib/auth';
 
 const PaginationComponent = dynamic(() => import('@/app/Components/Pagination'), { ssr: false });
@@ -11,12 +11,15 @@ type UserRow = {
   id: number | string;
   name: string;
   email: string;
-  role: 'Admin' | 'Photographer' | 'Client';
+  role: 'Admin' | 'Photographer' | 'Couple';
+  roleId?: string;
   contact: string;
   subscription: string;
   status: 'Active' | 'Offline';
+  invitationStatus?: 'sent' | 'accepted' | 'active';
   avatar: string;
   bio?: string;
+  partnerEmail?: string;
   instagram?: string;
   facebook?: string;
   tiktok?: string;
@@ -26,11 +29,21 @@ type UserRow = {
   website?: string;
 };
 
+const ROLE_OPTIONS = [
+  { label: 'Admin', role: 'admin', roleId: '6a0473dd612d82d9fe664511' },
+  { label: 'Photographer', role: 'photographer', roleId: '6a0473dd612d82d9fe664512' },
+  { label: 'Couple', role: 'couple', roleId: '6a0473de612d82d9fe664513' },
+] as const;
+
+const DEFAULT_ROLE_ID = ROLE_OPTIONS[1].roleId;
+
 const initialFormState = {
   fullName: '',
   email: '',
   password: '',
   phoneNumber: '',
+  partnerEmail: '',
+  invitationStatus: 'sent' as 'sent' | 'accepted' | 'active',
   bio: '',
   instagram: '',
   facebook: '',
@@ -40,7 +53,7 @@ const initialFormState = {
   linkedin: '',
   website: '',
   profileImage: '',
-  role: 'photographer' as const,
+  roleId: DEFAULT_ROLE_ID,
   subscriptionPlan: 'photographer-1-year' as 'photographer-1-year' | 'client-1-year',
   isActive: true,
 };
@@ -51,7 +64,7 @@ const popupSectionTitleStyle = {
   fontFamily: '"Plus Jakarta Sans", "Segoe UI", sans-serif',
   fontStyle: 'normal',
   fontWeight: 700,
-  color: 'rgb(177, 14, 107)',
+  color: '#9E0E5D',
   fontSize: '10px',
   lineHeight: '15px',
 } as const;
@@ -78,7 +91,7 @@ const statHeadingStyle = {
   fontFamily: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif',
   fontStyle: 'normal',
   fontWeight: 400,
-  color: 'rgb(177, 14, 107)',
+  color: '#9E0E5D',
   fontSize: '16px',
   lineHeight: '24px',
 } as const;
@@ -107,6 +120,11 @@ export default function UserManagementPage() {
   const [creatorName, setCreatorName] = useState('Current admin session');
   const [formData, setFormData] = useState(initialFormState);
   const [loading, setLoading] = useState(false);
+  const [isUsersLoading, setIsUsersLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [showPassword, setShowPassword] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000/api';
@@ -115,12 +133,18 @@ export default function UserManagementPage() {
     id: user.id || user._id,
     name: user.name || user.fullName || '',
     email: user.email || '',
-    role: (user.role || 'client').charAt(0).toUpperCase() + (user.role || 'client').slice(1),
+    role: (() => {
+      const roleName = user.role || user.roleId?.roleName || 'couple';
+      return roleName.charAt(0).toUpperCase() + roleName.slice(1);
+    })(),
+    roleId: user.roleId?._id?.toString?.() || user.roleId?.toString?.() || user.roleId || '',
     contact: user.contact || user.phone || user.phoneNumber || '',
     subscription: user.subscription || user.subscriptionPlan || '',
     status: user.status === 'active' || user.isActive ? 'Active' : 'Offline',
     avatar: user.avatar || user.profilePic || '',
     bio: user.bio || '',
+    partnerEmail: user.partnerEmail || '',
+    invitationStatus: user.invitationStatus || 'sent',
     instagram: user.instagram || user.socials?.instagram || '',
     facebook: user.facebook || user.socials?.facebook || '',
     tiktok: user.tiktok || user.socials?.tiktok || '',
@@ -148,6 +172,9 @@ export default function UserManagementPage() {
       const token = getStoredToken();
       if (!token) return;
 
+      setIsUsersLoading(true);
+      setLoadError('');
+
       try {
         const res = await fetch(`${apiBase}/admin/users`, {
           headers: {
@@ -164,11 +191,18 @@ export default function UserManagementPage() {
         setUsers((Array.isArray(data.users) ? data.users : []).map(normalizeUser));
       } catch (error) {
         console.error('❌ Load Users Error:', error);
+        setLoadError(error instanceof Error ? error.message : 'Failed to load users');
+      } finally {
+        setIsUsersLoading(false);
       }
     };
 
     loadUsers();
   }, [apiBase]);
+
+  const getRoleIdFromName = (role: string) => ROLE_OPTIONS.find((option) => option.role === role.toLowerCase())?.roleId || DEFAULT_ROLE_ID;
+
+  const getRoleNameFromId = (roleId: string) => ROLE_OPTIONS.find((option) => option.roleId === roleId)?.role || 'photographer';
 
   const updateField = (field: keyof typeof initialFormState, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -178,6 +212,7 @@ export default function UserManagementPage() {
     setEditingUserId(null);
     setFormData(initialFormState);
     setProfilePreview('');
+    setShowPassword(false);
     setIsFormOpen(true);
   };
 
@@ -190,7 +225,9 @@ export default function UserManagementPage() {
       email: user.email,
       phoneNumber: user.contact,
       bio: user.bio || '',
-      role: user.role.toLowerCase() as any,
+      roleId: user.roleId || getRoleIdFromName(user.role),
+      partnerEmail: user.partnerEmail || '',
+      invitationStatus: user.invitationStatus || 'sent',
       subscriptionPlan: user.subscription.toLowerCase().includes('photographer') 
         ? 'photographer-1-year' 
         : 'client-1-year',
@@ -203,6 +240,7 @@ export default function UserManagementPage() {
       linkedin: user.linkedin || '',
       website: user.website || '',
     });
+    setShowPassword(false);
     setIsFormOpen(true);
   };
 
@@ -228,6 +266,7 @@ export default function UserManagementPage() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
   e.preventDefault();
   setLoading(true);
+  const isEditing = editingUserId !== null;
 
   const token = getStoredToken();
 
@@ -246,7 +285,9 @@ export default function UserManagementPage() {
     password: formData.password,
     phoneNumber: formData.phoneNumber,
     bio: formData.bio,
-    role: formData.role,
+    partnerEmail: formData.partnerEmail,
+    roleId: formData.roleId,
+    role: getRoleNameFromId(formData.roleId),
     subscriptionPlan: formData.subscriptionPlan,
     instagram: formData.instagram,
     facebook: formData.facebook,
@@ -256,6 +297,7 @@ export default function UserManagementPage() {
     linkedin: formData.linkedin,
     website: formData.website,
     profileImage: profilePreview || formData.profileImage,
+    invitationStatus: formData.invitationStatus,
     isActive: formData.isActive,
   };
 
@@ -294,7 +336,7 @@ export default function UserManagementPage() {
       return [savedUser, ...prev];
     });
 
-    alert("✅ User created successfully!");
+    alert(isEditing ? '✅ User updated successfully!' : '✅ User created successfully!');
     closeForm();
 
   } catch (error: any) {
@@ -305,20 +347,95 @@ export default function UserManagementPage() {
   }
 };
 
-  const handleDeleteUser = (userId: number | string) => {
-    if (confirm('Are you sure you want to delete this user?')) {
-      setUsers(prev => prev.filter(user => user.id !== userId));
+  const handleDeleteUser = async (userId: number | string) => {
+    if (!confirm('Are you sure you want to delete this user?')) {
+      return;
+    }
+
+    const token = getStoredToken();
+    if (!token) {
+      alert('No token found. Please login again.');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${apiBase}/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const responseData = await res.json();
+
+      if (!res.ok) {
+        throw new Error(responseData.message || 'Failed to delete user');
+      }
+
+      setUsers((prev) => prev.filter((user) => user.id !== userId));
+    } catch (error: any) {
+      console.error('❌ Delete Error:', error);
+      alert(error.message || 'Failed to delete user');
     }
   };
 
-  const visibleUsers = users.filter((user) => {
-    const query = searchTerm.toLowerCase().trim();
+  const handleResendInvite = async (userId: number | string) => {
+    const token = getStoredToken();
+    if (!token) {
+      alert('No token found. Please login again.');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${apiBase}/admin/users/${userId}/resend-invite`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const responseData = await res.json();
+
+      if (!res.ok) {
+        throw new Error(responseData.message || 'Failed to resend invitation');
+      }
+
+      const updatedUser = normalizeUser(responseData.user || responseData);
+      setUsers((prev) => prev.map((user) => (user.id === updatedUser.id ? updatedUser : user)));
+      alert('✅ Invitation resent successfully!');
+    } catch (error: any) {
+      console.error('❌ Resend Invite Error:', error);
+      alert(error.message || 'Failed to resend invitation');
+    }
+  };
+
+  const totalUsers = users.length;
+  const activeUsers = users.filter((user) => user.status === 'Active').length;
+  const photographerUsers = users.filter((user) => user.role === 'Photographer').length;
+  const photographerSlots = 100;
+  const photographerCapacity = Math.round((photographerUsers / photographerSlots) * 100);
+  const isCoupleRole = formData.roleId === ROLE_OPTIONS[2].roleId;
+  const query = searchTerm.toLowerCase().trim();
+  const filteredUsers = users.filter((user) => {
     if (!query) return true;
     return [user.name, user.email, user.role, user.contact, user.subscription, user.status]
       .join(' ')
       .toLowerCase()
       .includes(query);
   });
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / itemsPerPage));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedUsers = filteredUsers.slice((safeCurrentPage - 1) * itemsPerPage, safeCurrentPage * itemsPerPage);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, itemsPerPage]);
+
+  useEffect(() => {
+    if (currentPage !== safeCurrentPage) {
+      setCurrentPage(safeCurrentPage);
+    }
+  }, [currentPage, safeCurrentPage]);
 
   return (
     <section className="min-h-[calc(100vh-72px)] bg-[#FFF8F7] px-4 py-6 text-[#111111] md:px-6 md:py-8">
@@ -327,7 +444,7 @@ export default function UserManagementPage() {
         <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p style={popupSectionTitleStyle}>Invite Flow</p>
-            <h1 className="mt-2 text-5xl" style={{ fontFamily: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif', fontWeight: 400 }}>
+            <h1 className="mt-2 text-5xl" style={{ fontFamily: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif', fontWeight: 400, color: '#9E0E5D' }}>
               User Management
             </h1>
             <p className="mt-1 max-w-2xl text-[#6f5b5c]" style={bodyTextStyle}>
@@ -346,14 +463,15 @@ export default function UserManagementPage() {
 
         {/* Stats */}
         <div className="grid gap-4 md:grid-cols-4">
-          <StatCard title="Total Users" value="1,284" meta="+12%" />
-          <StatCard title="Active Now" value="412" meta="Live" />
-          <StatCard title="Photographers" value="86" meta="/ 100 slots" />
+          <StatCard title="Total Users" value={String(totalUsers)} meta={loadError ? 'Error' : 'Live db'} />
+          <StatCard title="Active Now" value={String(activeUsers)} meta="Live" />
+          <StatCard title="Photographers" value={String(photographerUsers)} meta={`/ ${photographerSlots} slots`} />
           <div className="rounded-3xl bg-[#F3E5E6] p-5 shadow-lg">
             <p style={statHeadingStyle}>Pro Plan Usage</p>
-            <div className="mt-2 text-3xl font-light" style={statValueStyle}>92% Capacity</div>
+            <div className="mt-2 text-3xl font-light" style={statValueStyle}>{`${Math.min(100, photographerCapacity || 0)}% Capacity`}</div>
+             
             <div className="mt-4 h-1.5 bg-black/10 rounded-full overflow-hidden">
-              <div className="h-full w-[92%] bg-black rounded-full" />
+              <div className="h-full rounded-full bg-black" style={{ width: `${Math.min(100, photographerCapacity || 0)}%` }} />
             </div>
           </div>
         </div>
@@ -385,43 +503,72 @@ export default function UserManagementPage() {
                   <th className="px-5 py-4 text-xs font-semibold uppercase tracking-widest text-[#6f5b5c]">Role</th>
                   <th className="px-5 py-4 text-xs font-semibold uppercase tracking-widest text-[#6f5b5c]">Contact</th>
                   <th className="px-5 py-4 text-xs font-semibold uppercase tracking-widest text-[#6f5b5c]">Subscription</th>
+                  <th className="px-5 py-4 text-xs font-semibold uppercase tracking-widest text-[#6f5b5c]">Invite Status</th>
                   <th className="px-5 py-4 text-center text-xs font-semibold uppercase tracking-widest text-[#6f5b5c]">Status</th>
                   <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-widest text-[#6f5b5c]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F3E5E6]">
-                {visibleUsers.map((user) => (
-                  <tr key={user.id} className="hover:bg-[#FFF8F7] transition">
-                    <td className="px-5 py-5">
-                      <div className="flex items-center gap-3">
-                        <img src={user.avatar} alt={user.name} className="h-10 w-10 rounded-full object-cover ring-2 ring-white" />
-                        <div>
-                          <p className="font-semibold">{user.name}</p>
-                          <p className="text-sm text-[#6f5b5c]">{user.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-5 py-5"><RoleBadge role={user.role} /></td>
-                    <td className="px-5 py-5 text-sm text-[#6f5b5c]">{user.contact}</td>
-                    <td className="px-5 py-5"><p className="font-semibold">{user.subscription}</p></td>
-                    <td className="px-5 py-5 text-center"><StatusBadge status={user.status} /></td>
-                    <td className="px-5 py-5">
-                      <div className="flex justify-end gap-2">
-                        <button onClick={() => openEditForm(user)} className="h-9 w-9 flex items-center justify-center rounded-full border border-[#F3E5E6] hover:bg-[#FFF8F7] text-[#BC116E]">
-                          <PencilLine size={16} />
-                        </button>
-                        <button onClick={() => handleDeleteUser(user.id)} className="h-9 w-9 flex items-center justify-center rounded-full border border-[#F3E5E6] hover:bg-[#FFF8F7] text-[#BC116E]">
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
+                {isUsersLoading ? (
+                  <tr>
+                    <td className="px-5 py-10 text-center text-sm text-[#6f5b5c]" colSpan={7}>Loading users from the database...</td>
                   </tr>
-                ))}
+                ) : paginatedUsers.length > 0 ? (
+                  paginatedUsers.map((user) => (
+                    <tr key={user.id} className="transition hover:bg-[#FFF8F7]">
+                      <td className="px-5 py-5">
+                        <div className="flex items-center gap-3">
+                          <img src={user.avatar || '/images/avatar-placeholder.png'} alt={user.name} className="h-10 w-10 rounded-full object-cover ring-2 ring-white" />
+                          <div>
+                            <p className="font-semibold">{user.name}</p>
+                            <p className="text-sm text-[#6f5b5c]">{user.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-5"><RoleBadge role={user.role} /></td>
+                      <td className="px-5 py-5 text-sm text-[#6f5b5c]">{user.contact}</td>
+                      <td className="px-5 py-5"><p className="font-semibold">{user.subscription}</p></td>
+                      <td className="px-5 py-5"><InvitationBadge status={user.invitationStatus || 'sent'} /></td>
+                      <td className="px-5 py-5 text-center"><StatusBadge status={user.status} /></td>
+                      <td className="px-5 py-5">
+                        <div className="flex justify-end gap-2">
+                          <button onClick={() => openEditForm(user)} className="h-9 w-9 flex items-center justify-center rounded-full border border-[#F3E5E6] text-[#BC116E] hover:bg-[#FFF8F7]">
+                            <PencilLine size={16} />
+                          </button>
+                          <button onClick={() => handleDeleteUser(user.id)} className="h-9 w-9 flex items-center justify-center rounded-full border border-[#F3E5E6] text-[#BC116E] hover:bg-[#FFF8F7]">
+                            <Trash2 size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleResendInvite(user.id)}
+                            className="flex h-9 w-9 items-center justify-center rounded-full border border-[#F3E5E6] text-[#BC116E] hover:bg-[#FFF8F7]"
+                            aria-label="Resend invitation"
+                            title="Resend invitation"
+                          >
+                            <Mail size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td className="px-5 py-10 text-center text-sm text-[#6f5b5c]" colSpan={7}>No users found.</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
 
-          <PaginationComponent />
+          <PaginationComponent
+            totalItems={filteredUsers.length}
+            currentPage={safeCurrentPage}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onItemsPerPageChange={(value) => {
+              setItemsPerPage(value);
+              setCurrentPage(1);
+            }}
+          />
         </div>
       </div>
 
@@ -432,7 +579,7 @@ export default function UserManagementPage() {
             <div className="flex items-start justify-between border-b border-[#F3E5E6] px-6 py-5">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-widest text-[#BC116E]">User Form</p>
-                <h2 className="mt-1 text-2xl font-semibold">
+                <h2 className="mt-1 text-2xl font-semibold" style={{ color: '#9E0E5D' }}>
                   {editingUserId === null ? 'Create New User' : 'Edit User'}
                 </h2>
               </div>
@@ -453,17 +600,62 @@ export default function UserManagementPage() {
                       <Field label="Email Address">
                         <input type="email" value={formData.email} onChange={(e) => updateField('email', e.target.value)} className={inputClassName} required />
                       </Field>
+                      {isCoupleRole ? (
+                        <Field label="Partner Email">
+                          <input
+                            type="email"
+                            value={formData.partnerEmail}
+                            onChange={(e) => updateField('partnerEmail', e.target.value)}
+                            className={inputClassName}
+                            placeholder="Partner's email address"
+                            required
+                          />
+                        </Field>
+                      ) : null}
                       <Field label="Password">
-                        <input type="password" value={formData.password} onChange={(e) => updateField('password', e.target.value)} className={inputClassName} />
+                        <div className="relative">
+                          <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#BC116E]">
+                            <KeyRound size={18} />
+                          </span>
+                          <input
+                            type={showPassword ? 'text' : 'password'}
+                            value={formData.password}
+                            onChange={(e) => updateField('password', e.target.value)}
+                            className={`${inputClassName} pr-12 pl-11`}
+                            placeholder={editingUserId === null ? 'Set a password' : 'Leave blank to keep current password'}
+                            autoComplete={editingUserId === null ? 'new-password' : 'current-password'}
+                            required={editingUserId === null}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword((prev) => !prev)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-[#BC116E] hover:bg-[#FFF8F7]"
+                            aria-label={showPassword ? 'Hide password' : 'Show password'}
+                          >
+                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                          </button>
+                        </div>
+                        {formData.roleId === ROLE_OPTIONS[0].roleId ? (
+                          <p className="text-xs text-[#6f5b5c]">Admin accounts need a password before saving.</p>
+                        ) : null}
                       </Field>
                       <Field label="Phone Number">
                         <input type="tel" value={formData.phoneNumber} onChange={(e) => updateField('phoneNumber', e.target.value)} className={inputClassName} />
                       </Field>
                       <Field label="Role">
-                        <select value={formData.role} onChange={(e) => updateField('role', e.target.value)} className={inputClassName} required>
-                          <option value="admin">Admin</option>
-                          <option value="photographer">Photographer</option>
-                          <option value="client">Client</option>
+                        <select value={formData.roleId} onChange={(e) => updateField('roleId', e.target.value)} className={inputClassName} required>
+                          {ROLE_OPTIONS.map((option) => (
+                            <option key={option.roleId} value={option.roleId}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label="Invitation Status">
+                        <select value={formData.invitationStatus} onChange={(e) => updateField('invitationStatus', e.target.value)} className={inputClassName} required>
+                          <option value="sent">Sent</option>
+                          <option value="accepted">Accepted</option>
+                          <option value="active">Active</option>
                         </select>
                       </Field>
                       <Field label="Bio" className="md:col-span-2">
@@ -570,6 +762,20 @@ function StatusBadge({ status }: { status: UserRow['status'] }) {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full border border-[#F3E5E6] bg-[#FFF8F7] px-3 py-1 text-xs font-semibold">
       <span className="h-2 w-2 rounded-full bg-emerald-500" />{status}
+    </span>
+  );
+}
+
+function InvitationBadge({ status }: { status: NonNullable<UserRow['invitationStatus']> }) {
+  const styles: Record<NonNullable<UserRow['invitationStatus']>, string> = {
+    sent: 'border-[#F3E5E6] bg-[#FFF8F7] text-[#9E0E5D]',
+    accepted: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    active: 'border-blue-200 bg-blue-50 text-blue-700',
+  };
+
+  return (
+    <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold capitalize ${styles[status]}`}>
+      {status}
     </span>
   );
 }

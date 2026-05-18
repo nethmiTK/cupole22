@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -8,15 +8,27 @@ import {
   ChevronsRight,
 } from 'lucide-react';
 
-export default function PaginationComponent() {
-  const [currentPage, setCurrentPage] = useState(2);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
-  const totalItems = 50;
+type PaginationProps = {
+  totalItems: number;
+  currentPage: number;
+  itemsPerPage: number;
+  onPageChange: (page: number) => void;
+  onItemsPerPageChange: (value: number) => void;
+};
 
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
+export default function PaginationComponent({
+  totalItems,
+  currentPage,
+  itemsPerPage,
+  onPageChange,
+  onItemsPerPageChange,
+}: PaginationProps) {
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
 
-  const startItem = (currentPage - 1) * itemsPerPage + 1;
+  const startItem = totalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
   const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+
+  const pageLabel = useMemo(() => currentPage, [currentPage]);
 
   return (
     <div className="w-full flex items-center justify-between border-t pt-4 mt-10 px-4">
@@ -30,10 +42,9 @@ export default function PaginationComponent() {
         <select
           value={itemsPerPage}
           onChange={(e) => {
-            setItemsPerPage(Number(e.target.value));
-            setCurrentPage(1);
+            onItemsPerPageChange(Number(e.target.value));
           }}
-          className="border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-pink-500"
+          className="border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#BC116E]"
         >
           <option value={10}>10 per page</option>
           <option value={20}>20 per page</option>
@@ -46,7 +57,7 @@ export default function PaginationComponent() {
         
         {/* First */}
         <button
-          onClick={() => setCurrentPage(1)}
+          onClick={() => onPageChange(1)}
           disabled={currentPage === 1}
           className="p-2 rounded hover:bg-gray-100 disabled:opacity-40"
         >
@@ -55,7 +66,7 @@ export default function PaginationComponent() {
 
         {/* Prev */}
         <button
-          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+          onClick={() => onPageChange(Math.max(currentPage - 1, 1))}
           disabled={currentPage === 1}
           className="p-2 rounded hover:bg-gray-100 disabled:opacity-40"
         >
@@ -63,14 +74,14 @@ export default function PaginationComponent() {
         </button>
 
         {/* Current Page */}
-        <div className="bg-fuchsia-600 text-white px-4 py-2 rounded-lg font-semibold shadow">
-          {currentPage}
+        <div className="bg-[#BC116E] text-white px-4 py-2 rounded-lg font-semibold shadow">
+          {pageLabel}
         </div>
 
         {/* Next */}
         <button
           onClick={() =>
-            setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+            onPageChange(Math.min(currentPage + 1, totalPages))
           }
           disabled={currentPage === totalPages}
           className="p-2 rounded hover:bg-gray-100 disabled:opacity-40"
@@ -80,7 +91,7 @@ export default function PaginationComponent() {
 
         {/* Last */}
         <button
-          onClick={() => setCurrentPage(totalPages)}
+          onClick={() => onPageChange(totalPages)}
           disabled={currentPage === totalPages}
           className="p-2 rounded hover:bg-gray-100 disabled:opacity-40"
         >
