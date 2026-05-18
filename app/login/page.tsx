@@ -1,5 +1,5 @@
 "use client";
-
+import { toast } from "react-toastify";
 import { apiFetch } from "@/lib/api";
 import {
   getSafeReturnPath,
@@ -59,12 +59,12 @@ export default function LoginPage() {
       user: data.user,
     });
 
-    alert("Login success  ");
+    toast.success("Login successful");
 
      router.replace(nextPath);
 
   } catch (err: any) {
-    alert(err.message);
+    toast.error(err.message);
 
   } finally {
     setLoading(false);
