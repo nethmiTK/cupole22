@@ -1,10 +1,11 @@
 'use client';
+import { toast } from 'react-toastify';
 
 import dynamic from 'next/dynamic';
 import { useEffect, useRef, useState } from 'react';
 import { Eye, EyeOff, Facebook, Globe, Instagram, KeyRound, Linkedin, Mail, Music2, PencilLine, Trash2, Twitter, Upload, X, Youtube } from 'lucide-react';
 import { getStoredUser, getStoredToken } from '@/lib/auth';
-
+ 
 const PaginationComponent = dynamic(() => import('@/app/Components/Pagination'), { ssr: false });
 
 type UserRow = {
@@ -53,7 +54,7 @@ const initialFormState = {
   linkedin: '',
   website: '',
   profileImage: '',
-  roleId: DEFAULT_ROLE_ID,
+  roleId: DEFAULT_ROLE_ID as string,
   subscriptionPlan: 'photographer-1-year' as 'photographer-1-year' | 'client-1-year',
   isActive: true,
 };
@@ -190,7 +191,7 @@ export default function UserManagementPage() {
 
         setUsers((Array.isArray(data.users) ? data.users : []).map(normalizeUser));
       } catch (error) {
-        console.error('❌ Load Users Error:', error);
+        toast.error(`❌ Load Users Error: ${error instanceof Error ? error.message : 'Failed to load users'}`);
         setLoadError(error instanceof Error ? error.message : 'Failed to load users');
       } finally {
         setIsUsersLoading(false);
@@ -336,7 +337,7 @@ export default function UserManagementPage() {
       return [savedUser, ...prev];
     });
 
-    alert(isEditing ? '✅ User updated successfully!' : '✅ User created successfully!');
+  toast(isEditing ? ' User updated successfully!' : '✅ User created successfully!');
     closeForm();
 
   } catch (error: any) {
