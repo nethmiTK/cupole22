@@ -283,7 +283,7 @@ export default function UserManagementPage() {
   const payload = {
     fullName: formData.fullName,
     email: formData.email,
-    password: formData.password,
+    ...(formData.password && { password: formData.password }),
     phoneNumber: formData.phoneNumber,
     bio: formData.bio,
     partnerEmail: formData.partnerEmail,
@@ -624,7 +624,7 @@ export default function UserManagementPage() {
                             onChange={(e) => updateField('password', e.target.value)}
                             className={`${inputClassName} pr-12 pl-11`}
                             placeholder={editingUserId === null ? 'Set a password' : 'Leave blank to keep current password'}
-                            autoComplete={editingUserId === null ? 'new-password' : 'current-password'}
+                            autoComplete={editingUserId === null ? 'new-password' : 'off'}
                             required={editingUserId === null}
                           />
                           <button
@@ -636,9 +636,11 @@ export default function UserManagementPage() {
                             {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                           </button>
                         </div>
-                        {formData.roleId === ROLE_OPTIONS[0].roleId ? (
-                          <p className="text-xs text-[#6f5b5c]">Admin accounts need a password before saving.</p>
-                        ) : null}
+                        {editingUserId === null ? (
+                          <p className="text-xs text-[#6f5b5c]">Enter a secure password for the new user.</p>
+                        ) : (
+                          <p className="text-xs text-[#6f5b5c]">Leave empty to keep the current password. Fill in only if you want to change it.</p>
+                        )}
                       </Field>
                       <Field label="Phone Number">
                         <input type="tel" value={formData.phoneNumber} onChange={(e) => updateField('phoneNumber', e.target.value)} className={inputClassName} />

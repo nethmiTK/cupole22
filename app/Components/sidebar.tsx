@@ -31,8 +31,8 @@ export default function PhotographerSidebar({ isMobileOpen, onClose }: Photograp
 
   const mainMenuItems: MenuItem[] = [
     { label: 'Dashboard', href: '/admin/dashboard', icon: <LayoutDashboard size={20} /> },
-    { label: 'Albums', href: '/admin/albums', icon: <Image size={20} /> },
-    { label: 'Customers', href: '/admin/customers', icon: <Users size={20} /> },
+    // { label: 'Albums', href: '/admin/albums', icon: <Image size={20} /> },
+    // { label: 'Customers', href: '/admin/customers', icon: <Users size={20} /> },
     { label: 'Payments', href: '/admin/payments', icon: <CreditCard size={20} /> },
     { label: 'User Management', href: '/admin/photographers', icon: <UserCog size={20} /> },
   ];
