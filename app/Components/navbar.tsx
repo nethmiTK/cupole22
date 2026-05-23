@@ -54,6 +54,7 @@ export default function PhotographerNavbar({ onMenuClick }: PhotographerNavbarPr
   const getNavTitle = () => {
     if (pathname.includes('/admin/albums')) return 'Albums';
     if (pathname.includes('/admin/customers')) return 'Customers';
+    if (pathname.includes('/admin/template')) return 'Template';
     if (pathname.includes('/admin/payments')) return 'Payments';
     if (pathname.includes('/admin/photographers')) return 'User Management';
     return 'Dashboard';
@@ -72,7 +73,7 @@ export default function PhotographerNavbar({ onMenuClick }: PhotographerNavbarPr
         </button>
 
         {/* Title - Hidden on mobile */}
-        <div className="hidden md:block min-w-[220px]">
+        <div className="hidden md:block min-w-55">
           <h2
             className="font-serif"
             style={{
@@ -91,8 +92,8 @@ export default function PhotographerNavbar({ onMenuClick }: PhotographerNavbarPr
 
         {/* Search Bar */}
         <div className="flex-1 flex justify-center md:justify-end min-w-0">
-          <div className="flex items-center rounded-full px-5 py-3 w-full max-w-[320px] md:max-w-[420px] transition-all" style={{ backgroundColor: '#FEF0F1' }}>
-            <Search size={18} style={{ color: '#B8A7AF' }} className="flex-shrink-0" />
+          <div className="flex items-center rounded-full px-5 py-3 w-full max-w-[320px] md:max-w-105 transition-all" style={{ backgroundColor: '#FEF0F1' }}>
+            <Search size={18} style={{ color: '#B8A7AF' }} className="shrink-0" />
             <input
               type="text"
               placeholder="Search archive..."
@@ -114,7 +115,7 @@ export default function PhotographerNavbar({ onMenuClick }: PhotographerNavbarPr
           {/* Profile Avatar */}
           <Link
             href="/admin/profile"
-            className="hidden sm:block w-10 h-10 rounded-full overflow-hidden flex-shrink-0 transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2"
+            className="hidden sm:block w-10 h-10 rounded-full overflow-hidden shrink-0 transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2"
             style={{ backgroundColor: '#FBE9EC', boxShadow: '0 0 0 2px rgba(177,14,107,0.18)' }}
             title="Open profile"
             aria-label="Open profile"

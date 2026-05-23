@@ -11,6 +11,7 @@ import {
   UserCog,
   CircleUserRound,
   LogOut,
+  LayoutTemplate,
 } from 'lucide-react';
 import { clearAuthSession } from '@/lib/auth';
 
@@ -33,6 +34,7 @@ export default function PhotographerSidebar({ isMobileOpen, onClose }: Photograp
     { label: 'Dashboard', href: '/admin/dashboard', icon: <LayoutDashboard size={20} /> },
     // { label: 'Albums', href: '/admin/albums', icon: <Image size={20} /> },
     // { label: 'Customers', href: '/admin/customers', icon: <Users size={20} /> },
+    { label: 'Template', href: '/admin/template', icon: <LayoutTemplate size={20} /> },
     { label: 'Payments', href: '/admin/payments', icon: <CreditCard size={20} /> },
     { label: 'User Management', href: '/admin/photographers', icon: <UserCog size={20} /> },
   ];
@@ -80,7 +82,7 @@ export default function PhotographerSidebar({ isMobileOpen, onClose }: Photograp
               }`}
             >
               {active && <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r-full bg-[#B10E6B]"></div>}
-              <div className={`flex-shrink-0 w-5 h-5 ${active ? 'text-[#B10E6B]' : 'text-[#6B7387]'}`}>{item.icon}</div>
+              <div className={`shrink-0 w-5 h-5 ${active ? 'text-[#B10E6B]' : 'text-[#6B7387]'}`}>{item.icon}</div>
               <span className="text-sm font-medium tracking-wide">{item.label}</span>
             </Link>
           );
@@ -116,7 +118,7 @@ export default function PhotographerSidebar({ isMobileOpen, onClose }: Photograp
     <>
       {/* Desktop Sidebar */}
       <aside
-        className="hidden md:flex md:w-64 h-screen min-h-0 flex-col overflow-hidden flex-shrink-0"
+        className="hidden md:flex md:w-64 h-screen min-h-0 flex-col overflow-hidden shrink-0"
         style={{ backgroundColor: '#F3E5E6' }}
       >
         <SidebarContent />
@@ -132,7 +134,7 @@ export default function PhotographerSidebar({ isMobileOpen, onClose }: Photograp
       )}
 
       <aside
-        className={`md:hidden fixed left-0 top-0 bottom-0 w-72 z-50 transform transition-transform duration-200 flex flex-col overflow-hidden flex-shrink-0 ${
+        className={`md:hidden fixed left-0 top-0 bottom-0 w-72 z-50 transform transition-transform duration-200 flex flex-col overflow-hidden shrink-0 ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{ backgroundColor: '#F3E5E6' }}

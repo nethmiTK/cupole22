@@ -8,10 +8,12 @@ import {
   Image,
   Users,
   CreditCard,
+  LayoutTemplate,
 } from 'lucide-react';
 
 const navItems = [
   { href: '/admin/dashboard', icon: <LayoutDashboard size={22} />, label: 'Home' },
+  { href: '/admin/template', icon: <LayoutTemplate size={22} />, label: 'Template' },
   { href: '/admin/albums', icon: <Image size={22} />, label: 'Albums' },
   { href: '/admin/customers', icon: <Users size={22} />, label: 'Customers' },
   { href: '/admin/payments', icon: <CreditCard size={22} />, label: 'Payments' },
