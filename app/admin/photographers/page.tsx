@@ -1,10 +1,9 @@
 'use client';
 import { toast } from 'react-toastify';
-
 import dynamic from 'next/dynamic';
 import { useEffect, useRef, useState } from 'react';
 import { Eye, EyeOff, Facebook, Globe, Instagram, KeyRound, Linkedin, Mail, Music2, PencilLine, Trash2, Twitter, Upload, X, Youtube } from 'lucide-react';
-import { getStoredUser, getStoredToken } from '@/lib/auth';
+import { getStoredToken } from '@/lib/auth';
  
 const PaginationComponent = dynamic(() => import('@/app/Components/Pagination'), { ssr: false });
 
@@ -15,7 +14,6 @@ type UserRow = {
   role: 'Admin' | 'Photographer' | 'Couple';
   roleId?: string;
   contact: string;
-  subscription: string;
   status: 'Active' | 'Offline';
   invitationStatus?: 'sent' | 'accepted' | 'active';
   avatar: string;
@@ -55,7 +53,6 @@ const initialFormState = {
   website: '',
   profileImage: '',
   roleId: DEFAULT_ROLE_ID as string,
-  subscriptionPlan: 'photographer-1-year' as 'photographer-1-year' | 'client-1-year',
   isActive: true,
 };
 
@@ -106,10 +103,107 @@ const statValueStyle = {
   lineHeight: '32px',
 } as const;
 
-const subscriptionPlans = [
-  { value: 'photographer-1-year', title: 'Photographer', description: '1 year plan / Rs 5000' },
-  { value: 'client-1-year', title: 'Client', description: '1 year plan / Rs 5000' },
-] as const;
+type RawUserRecord = {
+  id?: string | number;
+  _id?: string | number;
+  name?: string;
+  fullName?: string;
+  email?: string;
+  role?: string;
+  roleId?: {
+    _id?: string | number;
+    roleName?: string;
+  } | string | number;
+  contact?: string;
+  phone?: string;
+  phoneNumber?: string;
+  status?: string;
+  isActive?: boolean;
+  avatar?: string;
+  profilePic?: string;
+  bio?: string;
+  partnerEmail?: string;
+  invitationStatus?: 'sent' | 'accepted' | 'active';
+  instagram?: string;
+  facebook?: string;
+  tiktok?: string;
+  x?: string;
+  youtube?: string;
+  linkedin?: string;
+  website?: string;
+  socials?: {
+    instagram?: string;
+    facebook?: string;
+    tiktok?: string;
+    x?: string;
+    youtube?: string;
+    linkedin?: string;
+    website?: string;
+  };
+};
+
+let cachedUsers: UserRow[] | null = null;
+let cachedUsersPromise: Promise<UserRow[]> | null = null;
+
+const normalizeUser = (user: RawUserRecord): UserRow => ({
+  id: user.id ?? user._id ?? '',
+  name: user.name || user.fullName || '',
+  email: user.email || '',
+  role: (() => {
+    const roleName = user.role || (typeof user.roleId === 'object' && user.roleId !== null ? user.roleId.roleName : undefined) || 'couple';
+    const normalizedRole = roleName.toLowerCase();
+
+    if (normalizedRole === 'admin') return 'Admin';
+    if (normalizedRole === 'photographer') return 'Photographer';
+    return 'Couple';
+  })(),
+  roleId: typeof user.roleId === 'object' && user.roleId !== null
+    ? (user.roleId._id?.toString?.() || user.roleId.toString?.() || '')
+    : (user.roleId?.toString?.() || ''),
+  contact: user.contact || user.phone || user.phoneNumber || '',
+  status: user.status === 'active' || user.isActive ? 'Active' : 'Offline',
+  avatar: user.avatar || user.profilePic || '',
+  bio: user.bio || '',
+  partnerEmail: user.partnerEmail || '',
+  invitationStatus: user.invitationStatus || 'sent',
+  instagram: user.instagram || user.socials?.instagram || '',
+  facebook: user.facebook || user.socials?.facebook || '',
+  tiktok: user.tiktok || user.socials?.tiktok || '',
+  x: user.x || user.socials?.x || '',
+  youtube: user.youtube || user.socials?.youtube || '',
+  linkedin: user.linkedin || user.socials?.linkedin || '',
+  website: user.website || user.socials?.website || '',
+});
+
+const loadUsersFromApi = async (apiBase: string, token: string) => {
+  if (cachedUsers) {
+    return cachedUsers;
+  }
+
+  if (!cachedUsersPromise) {
+    cachedUsersPromise = fetch(`${apiBase}/admin/users`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+      .then(async (res) => {
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.message || 'Failed to load users');
+        }
+
+        const usersList = (Array.isArray(data.users) ? data.users : []).map(normalizeUser);
+        cachedUsers = usersList;
+        return usersList;
+      })
+      .finally(() => {
+        cachedUsersPromise = null;
+      });
+  }
+
+  return cachedUsersPromise;
+};
 
 export default function UserManagementPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -118,7 +212,6 @@ export default function UserManagementPage() {
   const [editingUserId, setEditingUserId] = useState<number | string | null>(null);
   const [profilePreview, setProfilePreview] = useState('');
   const [isDropActive, setIsDropActive] = useState(false);
-  const [creatorName, setCreatorName] = useState('Current admin session');
   const [formData, setFormData] = useState(initialFormState);
   const [loading, setLoading] = useState(false);
   const [isUsersLoading, setIsUsersLoading] = useState(false);
@@ -130,45 +223,15 @@ export default function UserManagementPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000/api';
 
-  const normalizeUser = (user: any): UserRow => ({
-    id: user.id || user._id,
-    name: user.name || user.fullName || '',
-    email: user.email || '',
-    role: (() => {
-      const roleName = user.role || user.roleId?.roleName || 'couple';
-      return roleName.charAt(0).toUpperCase() + roleName.slice(1);
-    })(),
-    roleId: user.roleId?._id?.toString?.() || user.roleId?.toString?.() || user.roleId || '',
-    contact: user.contact || user.phone || user.phoneNumber || '',
-    subscription: user.subscription || user.subscriptionPlan || '',
-    status: user.status === 'active' || user.isActive ? 'Active' : 'Offline',
-    avatar: user.avatar || user.profilePic || '',
-    bio: user.bio || '',
-    partnerEmail: user.partnerEmail || '',
-    invitationStatus: user.invitationStatus || 'sent',
-    instagram: user.instagram || user.socials?.instagram || '',
-    facebook: user.facebook || user.socials?.facebook || '',
-    tiktok: user.tiktok || user.socials?.tiktok || '',
-    x: user.x || user.socials?.x || '',
-    youtube: user.youtube || user.socials?.youtube || '',
-    linkedin: user.linkedin || user.socials?.linkedin || '',
-    website: user.website || user.socials?.website || '',
-  });
-
   // Prevent background scroll
   useEffect(() => {
     document.body.style.overflow = isFormOpen ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
   }, [isFormOpen]);
 
-  // Load creator name
   useEffect(() => {
-    const storedUser = getStoredUser() as any;
-    const displayName = storedUser?.name || storedUser?.fullName || storedUser?.email;
-    if (displayName) setCreatorName(displayName);
-  }, []);
+    let isMounted = true;
 
-  useEffect(() => {
     const loadUsers = async () => {
       const token = getStoredToken();
       if (!token) return;
@@ -177,28 +240,31 @@ export default function UserManagementPage() {
       setLoadError('');
 
       try {
-        const res = await fetch(`${apiBase}/admin/users`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(data.message || 'Failed to load users');
+        const loadedUsers = await loadUsersFromApi(apiBase, token);
+        if (isMounted) {
+          setUsers(loadedUsers);
+        }
+      } catch (error: unknown) {
+        if (!isMounted) {
+          return;
         }
 
-        setUsers((Array.isArray(data.users) ? data.users : []).map(normalizeUser));
-      } catch (error) {
         toast.error(`❌ Load Users Error: ${error instanceof Error ? error.message : 'Failed to load users'}`);
         setLoadError(error instanceof Error ? error.message : 'Failed to load users');
       } finally {
+        if (!isMounted) {
+          return;
+        }
+
         setIsUsersLoading(false);
       }
     };
 
     loadUsers();
+
+    return () => {
+      isMounted = false;
+    };
   }, [apiBase]);
 
   const getRoleIdFromName = (role: string) => ROLE_OPTIONS.find((option) => option.role === role.toLowerCase())?.roleId || DEFAULT_ROLE_ID;
@@ -229,9 +295,6 @@ export default function UserManagementPage() {
       roleId: user.roleId || getRoleIdFromName(user.role),
       partnerEmail: user.partnerEmail || '',
       invitationStatus: user.invitationStatus || 'sent',
-      subscriptionPlan: user.subscription.toLowerCase().includes('photographer') 
-        ? 'photographer-1-year' 
-        : 'client-1-year',
       profileImage: user.avatar,
       instagram: user.instagram || '',
       facebook: user.facebook || '',
@@ -271,9 +334,6 @@ export default function UserManagementPage() {
 
   const token = getStoredToken();
 
-  console.log("🔑 Token:", token ? "Exists" : "Missing");
-  console.log("🌐 API URL:", `${apiBase}/admin/users`);
-
   if (!token) {
     alert("No token found. Please login again.");
     setLoading(false);
@@ -289,7 +349,6 @@ export default function UserManagementPage() {
     partnerEmail: formData.partnerEmail,
     roleId: formData.roleId,
     role: getRoleNameFromId(formData.roleId),
-    subscriptionPlan: formData.subscriptionPlan,
     instagram: formData.instagram,
     facebook: formData.facebook,
     tiktok: formData.tiktok,
@@ -302,8 +361,6 @@ export default function UserManagementPage() {
     isActive: formData.isActive,
   };
 
-  console.log("📦 Payload being sent:", payload);
-
   try {
     const res = await fetch(`${apiBase}/admin/users`, {
       method: 'POST',
@@ -314,10 +371,7 @@ export default function UserManagementPage() {
       body: JSON.stringify(payload),
     });
 
-    console.log("📡 Response Status:", res.status);
-
     const responseData = await res.json();
-    console.log("📥 Response Body:", responseData);
 
     if (!res.ok) {
       throw new Error(responseData.message || `Error ${res.status}`);
@@ -331,18 +385,21 @@ export default function UserManagementPage() {
       if (existingIndex >= 0) {
         const next = [...prev];
         next[existingIndex] = savedUser;
+        cachedUsers = next;
         return next;
       }
 
-      return [savedUser, ...prev];
+      const next = [savedUser, ...prev];
+      cachedUsers = next;
+      return next;
     });
 
-  toast(isEditing ? ' User updated successfully!' : '✅ User created successfully!');
+  toast(isEditing ? 'User updated successfully!' : 'User created successfully!');
     closeForm();
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("❌ Save Error:", error);
-    alert(error.message || "Failed to save user");
+    alert(error instanceof Error ? error.message : "Failed to save user");
   } finally {
     setLoading(false);
   }
@@ -374,9 +431,10 @@ export default function UserManagementPage() {
       }
 
       setUsers((prev) => prev.filter((user) => user.id !== userId));
-    } catch (error: any) {
+      cachedUsers = cachedUsers?.filter((user) => user.id !== userId) || null;
+    } catch (error: unknown) {
       console.error('❌ Delete Error:', error);
-      alert(error.message || 'Failed to delete user');
+      alert(error instanceof Error ? error.message : 'Failed to delete user');
     }
   };
 
@@ -403,10 +461,11 @@ export default function UserManagementPage() {
 
       const updatedUser = normalizeUser(responseData.user || responseData);
       setUsers((prev) => prev.map((user) => (user.id === updatedUser.id ? updatedUser : user)));
+      cachedUsers = cachedUsers?.map((user) => (user.id === updatedUser.id ? updatedUser : user)) || null;
       alert('✅ Invitation resent successfully!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Resend Invite Error:', error);
-      alert(error.message || 'Failed to resend invitation');
+      alert(error instanceof Error ? error.message : 'Failed to resend invitation');
     }
   };
 
@@ -419,7 +478,7 @@ export default function UserManagementPage() {
   const query = searchTerm.toLowerCase().trim();
   const filteredUsers = users.filter((user) => {
     if (!query) return true;
-    return [user.name, user.email, user.role, user.contact, user.subscription, user.status]
+    return [user.name, user.email, user.role, user.contact, user.status]
       .join(' ')
       .toLowerCase()
       .includes(query);
@@ -503,7 +562,6 @@ export default function UserManagementPage() {
                   <th className="px-5 py-4 text-xs font-semibold uppercase tracking-widest text-[#6f5b5c]">Full Name</th>
                   <th className="px-5 py-4 text-xs font-semibold uppercase tracking-widest text-[#6f5b5c]">Role</th>
                   <th className="px-5 py-4 text-xs font-semibold uppercase tracking-widest text-[#6f5b5c]">Contact</th>
-                  <th className="px-5 py-4 text-xs font-semibold uppercase tracking-widest text-[#6f5b5c]">Subscription</th>
                   <th className="px-5 py-4 text-xs font-semibold uppercase tracking-widest text-[#6f5b5c]">Invite Status</th>
                   <th className="px-5 py-4 text-center text-xs font-semibold uppercase tracking-widest text-[#6f5b5c]">Status</th>
                   <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-widest text-[#6f5b5c]">Actions</th>
@@ -512,7 +570,7 @@ export default function UserManagementPage() {
               <tbody className="divide-y divide-[#F3E5E6]">
                 {isUsersLoading ? (
                   <tr>
-                    <td className="px-5 py-10 text-center text-sm text-[#6f5b5c]" colSpan={7}>Loading users from the database...</td>
+                    <td className="px-5 py-10 text-center text-sm text-[#6f5b5c]" colSpan={6}>Loading users from the database...</td>
                   </tr>
                 ) : paginatedUsers.length > 0 ? (
                   paginatedUsers.map((user) => (
@@ -528,7 +586,6 @@ export default function UserManagementPage() {
                       </td>
                       <td className="px-5 py-5"><RoleBadge role={user.role} /></td>
                       <td className="px-5 py-5 text-sm text-[#6f5b5c]">{user.contact}</td>
-                      <td className="px-5 py-5"><p className="font-semibold">{user.subscription}</p></td>
                       <td className="px-5 py-5"><InvitationBadge status={user.invitationStatus || 'sent'} /></td>
                       <td className="px-5 py-5 text-center"><StatusBadge status={user.status} /></td>
                       <td className="px-5 py-5">
@@ -553,7 +610,7 @@ export default function UserManagementPage() {
                   ))
                 ) : (
                   <tr>
-                    <td className="px-5 py-10 text-center text-sm text-[#6f5b5c]" colSpan={7}>No users found.</td>
+                    <td className="px-5 py-10 text-center text-sm text-[#6f5b5c]" colSpan={6}>No users found.</td>
                   </tr>
                 )}
               </tbody>
@@ -696,14 +753,6 @@ export default function UserManagementPage() {
 
                 {/* Right Column */}
                 <div className="space-y-8">
-                  <SectionCard title="Subscription Plan" titleStyle={popupSectionTitleStyle}>
-                    <div className="space-y-3">
-                      {subscriptionPlans.map((plan) => (
-                        <PlanCard key={plan.value} {...plan} active={formData.subscriptionPlan === plan.value} onClick={() => updateField('subscriptionPlan', plan.value)} />
-                      ))}
-                    </div>
-                  </SectionCard>
-
                   <SectionCard title="Account Status" titleStyle={popupSectionTitleStyle}>
                     <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-[#F3E5E6] p-4 hover:bg-[#FFF8F7]">
                       <div>
@@ -807,21 +856,5 @@ function SocialLabel({ icon, text }: { icon: React.ReactNode; text: string }) {
       <span className="text-[#BC116E]">{icon}</span>
       {text}
     </span>
-  );
-}
-
-function PlanCard({ title, description, active, onClick }: { title: string; description: string; active: boolean; onClick: () => void }) {
-  return (
-    <button type="button" onClick={onClick} className={`w-full rounded-2xl border p-4 text-left transition-all ${active ? 'border-[#BC116E] bg-white shadow-sm' : 'border-[#F3E5E6] hover:border-[#e7c6d4]'}`}>
-      <div className="flex justify-between items-start">
-        <div>
-          <p className="font-semibold">{title}</p>
-          <p className="text-sm text-[#6f5b5c]">{description}</p>
-        </div>
-        <div className={`mt-1 h-5 w-5 rounded-full border-2 flex items-center justify-center ${active ? 'border-[#BC116E] bg-[#BC116E]' : 'border-gray-300'}`}>
-          {active && <div className="h-2.5 w-2.5 bg-white rounded-full" />}
-        </div>
-      </div>
-    </button>
   );
 }
