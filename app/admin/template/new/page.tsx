@@ -273,34 +273,37 @@ export default function NewTemplatePage() {
 
       setIsLoading(true);
       try {
-        const draftRaw = window.localStorage.getItem(storageKey);
-        if (draftRaw) {
-          try {
-            const draft = JSON.parse(draftRaw);
-            setName(draft.name || 'Untitled Template');
-            setDescription(draft.description || '');
-            setAccent(draft.accent || '#9b0044');
-            setPageColor(draft.pageColor || '#ffffff');
-            setPages(Array.isArray(draft.pages) && draft.pages.length > 0 ? draft.pages : [{ id: 1, label: 'Page 1', pageColor: '#ffffff', slots: [] }]);
-            setCoverDesign(draft.coverDesign || createSpecialPage(draft.pageColor || '#ffffff'));
-            setEndPageDesign(draft.endPageDesign || createSpecialPage(draft.pageColor || '#ffffff'));
-            setActiveCanvas(draft.activeCanvas === 'cover' || draft.activeCanvas === 'end' ? draft.activeCanvas : 'content');
-            setCurrentPageIndex(typeof draft.currentPageIndex === 'number' ? draft.currentPageIndex : 0);
-            setSelectedSlotId(null);
-            setMessage('Recovered unsaved draft from local storage');
-            return;
-          } catch {
-            window.localStorage.removeItem(storageKey);
-          }
-        }
-
         if (!editingTemplateId) {
+          const draftRaw = window.localStorage.getItem(storageKey);
+          if (draftRaw) {
+            try {
+              const draft = JSON.parse(draftRaw);
+              setName(draft.name || 'Untitled Template');
+              setDescription(draft.description || '');
+              setAccent(draft.accent || '#9b0044');
+              setPageColor(draft.pageColor || '#ffffff');
+              setPages(Array.isArray(draft.pages) && draft.pages.length > 0 ? draft.pages : [{ id: 1, label: 'Page 1', pageColor: '#ffffff', slots: [] }]);
+              setCoverDesign(draft.coverDesign || createSpecialPage(draft.pageColor || '#ffffff'));
+              setEndPageDesign(draft.endPageDesign || createSpecialPage(draft.pageColor || '#ffffff'));
+              setActiveCanvas(draft.activeCanvas === 'cover' || draft.activeCanvas === 'end' ? draft.activeCanvas : 'content');
+              setCurrentPageIndex(typeof draft.currentPageIndex === 'number' ? draft.currentPageIndex : 0);
+              setSelectedSlotId(null);
+              setMessage('Recovered unsaved draft from local storage');
+              return;
+            } catch {
+              window.localStorage.removeItem(storageKey);
+            }
+          }
+
           return;
         }
 
         const data = await apiFetch(`/admin/templates/${editingTemplateId}`);
         const found = data?.template;
-        if (!found) return;
+        if (!found) {
+          setMessage('Unable to find template to edit');
+          return;
+        }
 
         setName(found.name || 'Untitled Template');
         setDescription(found.description || '');
