@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ComponentType } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import HTMLFlipBook from 'react-pageflip';
 import { ArrowLeft, ChevronLeft, ChevronRight, Edit, Sparkles, Trash2 } from 'lucide-react';
@@ -23,6 +24,7 @@ type TemplateSlot = {
 type TemplatePage = {
   pageNumber: number;
   pageLabel?: string;
+  pageColor?: string;
   slots: TemplateSlot[];
 };
 
@@ -31,87 +33,97 @@ type TemplateRecord = {
   name: string;
   description?: string;
   accent?: string;
+  pageColor?: string;
   coverImage?: string;
   coverUrl?: string;
+  coverDesign?: {
+    pageColor?: string;
+    slots?: TemplateSlot[];
+  };
+  endPageDesign?: {
+    pageColor?: string;
+    slots?: TemplateSlot[];
+  };
   slots?: TemplateSlot[];
   pages?: TemplatePage[];
 };
 
-const FlipBook = HTMLFlipBook as any;
+type FlipBookApi = {
+  flip?: (page: number) => void;
+  flipNext?: () => void;
+};
 
-function CoverPage({ template, accent }: { template: TemplateRecord; accent: string }) {
+type FlipBookRef = {
+  pageFlip?: () => FlipBookApi;
+} | null;
+
+const FlipBook = HTMLFlipBook as unknown as ComponentType<Record<string, unknown>>;
+
+function SlotLayer({ slots }: { slots: TemplateSlot[] }) {
+  return (
+    <>
+      {slots.map((slot) => {
+        const shape = slot.shape || 'square';
+        const left = Number.isFinite(Number(slot.x)) ? Number(slot.x) : 0;
+        const top = Number.isFinite(Number(slot.y)) ? Number(slot.y) : 0;
+        const width = Math.max(1, Number.isFinite(Number(slot.width)) ? Number(slot.width) : 1);
+        const height = Math.max(1, Number.isFinite(Number(slot.height)) ? Number(slot.height) : 1);
+        const isCircle = shape === 'circle';
+        const isTriangle = shape === 'triangle';
+
+        return (
+          <article
+            key={slot.id}
+            className="absolute overflow-hidden bg-[#f5f5f5] shadow-sm"
+            style={{
+              left: `${left}%`,
+              top: `${top}%`,
+              width: `${width}%`,
+              height: `${height}%`,
+              borderRadius: isCircle ? '9999px' : isTriangle ? '0.5rem' : '0.5rem',
+              clipPath: isTriangle ? 'polygon(50% 0%, 100% 100%, 0% 100%)' : undefined,
+            }}
+          >
+            <div className="absolute inset-0 bg-[linear-gradient(140deg,rgba(255,255,255,0.5),rgba(0,0,0,0.02))]" />
+            <div className="absolute inset-0 flex items-center justify-center p-2 text-center">
+              {slot.kind === 'text' ? (
+                <p className="text-[12px] font-medium text-[#1a1c1d] leading-tight md:text-[14px]">{slot.label || 'Text Slot'}</p>
+              ) : (
+                <div className="text-center">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#999]">{slot.kind}</p>
+                  <p className="mt-1 text-[11px] font-medium text-[#666] md:text-[12px]">{slot.label || slot.id}</p>
+                </div>
+              )}
+            </div>
+          </article>
+        );
+      })}
+    </>
+  );
+}
+
+function CoverPage({ template }: { template: TemplateRecord }) {
   const coverTitle = template.name || 'Template Book';
   const coverImage = template.coverImage || template.coverUrl;
-  const previewSlots = (template.pages?.[0]?.slots || template.slots || []).slice(0, 4);
+  const coverColor = template.coverDesign?.pageColor || template.pageColor || '#ffffff';
+  const coverSlots = template.coverDesign?.slots || [];
 
   return (
-    <div className="h-full w-full bg-[#FEF6F6] p-4 md:p-6">
-      <div className="flex h-full flex-col overflow-hidden rounded-[1.4rem] border border-[#e9d8dd] bg-white shadow-[0_18px_55px_rgba(0,0,0,0.08)]">
-        <div className="flex items-center justify-between border-b border-[#f0e2e6] px-4 py-3 md:px-5">
-          <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-[#8d7d81]">Cover</p>
-          <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#8d7d81]">{template.pages?.length || 0} pages</p>
+    <div className="h-full w-full bg-[#FEF6F6] p-2 md:p-3">
+      <div className="flex h-full flex-col overflow-hidden rounded-[1.2rem] border border-[#e9d8dd] bg-white shadow-[0_18px_55px_rgba(0,0,0,0.08)]">
+        <div className="flex items-center justify-between border-b border-[#f0e2e6] px-4 py-2">
+          <p className="text-[9px] font-bold uppercase tracking-[0.24em] text-[#8d7d81]">Cover</p>
+          <Sparkles className="h-4 w-4 text-[#9b0044]" />
         </div>
-
-        <div className="relative flex flex-1 flex-col justify-between overflow-hidden bg-[#fff8f7] p-5 md:p-6">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(155,0,68,0.06),transparent_45%),linear-gradient(145deg,rgba(255,255,255,0.85),rgba(255,255,255,0.4))]" />
-
-          <div className="relative z-10 text-left text-[9px] font-bold uppercase tracking-[0.22em] text-[#8d7d81]">
-            <span>MemoAlbum</span>
+        <div className="relative flex-1 overflow-hidden" style={{ backgroundColor: coverColor }}>
+          {coverImage ? <img src={coverImage} alt={coverTitle} className="absolute inset-0 h-full w-full object-cover opacity-35" /> : null}
+          <div className="absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.75),rgba(255,255,255,0.22))]" />
+          <div className="absolute inset-x-0 top-0 z-10 p-4">
+            <h1 className="font-['Libre_Caslon_Text'] text-[26px] leading-[1.05] text-[#1a1c1d] md:text-[34px]">{coverTitle}</h1>
+            <p className="mt-2 text-[12px] text-[#6b5d60]">{template.description || 'Custom cover design'}</p>
           </div>
-
-          <div className="relative z-10 mx-auto flex w-full max-w-none flex-1 items-center justify-center py-2 md:py-4">
-            <div className="grid w-full gap-4 md:grid-cols-[1.05fr_0.95fr]">
-              <div className="relative overflow-hidden rounded-[1.2rem] border border-[#ead5dc] bg-[#fbf6f7] p-4 shadow-[0_16px_32px_rgba(0,0,0,0.06)]">
-                <div className="absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.85),rgba(0,0,0,0.02))]" />
-                <div className="relative z-10 flex h-full min-h-72 flex-col justify-between">
-                  <div>
-                    <p className="text-[9px] font-bold uppercase tracking-[0.24em] text-[#8d7d81]">Cover Photo</p>
-                    <h1 className="mt-3 font-['Libre_Caslon_Text'] text-[30px] leading-[1.05] text-[#1a1c1d] md:text-[36px]">{coverTitle}</h1>
-                    <p className="mt-3 max-w-sm text-[13px] leading-6 text-[#6b5d60]">
-                      {template.description || 'Open the book to preview the full album flow in a clean page-turn format.'}
-                    </p>
-                  </div>
-
-                  {coverImage ? (
-                    <div className="mt-4 overflow-hidden rounded-2xl border border-[#ead5dc] bg-white shadow-[0_12px_28px_rgba(0,0,0,0.08)]">
-                      <img src={coverImage} alt={coverTitle} className="h-64 w-full object-cover md:h-80" />
-                    </div>
-                  ) : null}
-
-                  <div className="mt-4 flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.2em] text-[#8d7d81]">
-                    <Sparkles className="h-4 w-4 text-[#9b0044]" />
-                    First page cover
-                  </div>
-                </div>
-              </div>
-
-              <div className="overflow-hidden rounded-[1.2rem] border border-[#ead5dc] bg-[#fdf8f9] p-4 shadow-[0_16px_32px_rgba(0,0,0,0.05)]">
-                <div className="flex h-full min-h-72 flex-col justify-between">
-                  <div className="flex items-center justify-between">
-                    <p className="text-[9px] font-bold uppercase tracking-[0.24em] text-[#8d7d81]">Preview</p>
-                    <span className="rounded-full border border-[#e6cfd7] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.18em] text-[#9b0044]">Book Mode</span>
-                  </div>
-
-                  <div className="mt-4 grid flex-1 grid-cols-2 gap-3">
-                    {previewSlots.map((slot, index) => (
-                      <div
-                        key={`${slot.id}-${index}`}
-                        className="overflow-hidden rounded-[0.9rem] border border-[#ead5dc] bg-white p-3"
-                        style={{ borderColor: `${accent}28` }}
-                      >
-                        <div className="h-full min-h-19.5 rounded-xl bg-[linear-gradient(145deg,rgba(255,255,255,0.96),rgba(155,0,68,0.03))]" />
-                        <p className="mt-2 text-[9px] font-bold uppercase tracking-[0.2em] text-[#8d7d81]">{slot.label || slot.id}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="relative z-10 flex items-center justify-between border-t border-[#f0e2e6] pt-3 text-[9px] font-bold uppercase tracking-[0.22em] text-[#8d7d81]">
-            <span>Open like a book</span>
-            <span>Hover or click to flip</span>
+          <div className="absolute inset-0">
+            <SlotLayer slots={coverSlots} />
           </div>
         </div>
       </div>
@@ -119,49 +131,37 @@ function CoverPage({ template, accent }: { template: TemplateRecord; accent: str
   );
 }
 
-function BookPage({ page, accent, pageLabel }: { page: TemplatePage; accent: string; pageLabel: string }) {
+function BookPage({ page, pageLabel, pageColor }: { page: TemplatePage; pageLabel: string; pageColor?: string }) {
+  const bgColor = pageColor || page.pageColor || '#ffffff';
+  
   return (
     <div className="h-full w-full bg-[#FFF8F7] p-1 md:p-2">
-      <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-[#ede5e8] bg-white p-3 md:p-4 shadow-[0_14px_35px_rgba(0,0,0,0.06)]">
+      <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-[#ede5e8] p-3 md:p-4 shadow-[0_14px_35px_rgba(0,0,0,0.06)]" style={{ backgroundColor: bgColor }}>
         <div className="flex items-center justify-between border-b border-[#f2e8ec] pb-2">
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#8d7d81]">{pageLabel}</p>
           <span className="text-[10px] uppercase tracking-[0.14em] text-[#8d7d81]">{page.slots.length} slots</span>
         </div>
 
-        <div className="relative mt-3 flex-1 overflow-hidden rounded-2xl border border-[#f2e8ec] bg-[radial-gradient(circle_at_top,rgba(155,0,68,0.05),transparent_42%),linear-gradient(180deg,rgba(255,255,255,1),rgba(255,248,249,1))]">
-          {page.slots.map((slot) => {
-            const shape = slot.shape || 'square';
-            const left = Number.isFinite(Number(slot.x)) ? Number(slot.x) : 0;
-            const top = Number.isFinite(Number(slot.y)) ? Number(slot.y) : 0;
-            const width = Math.max(1, Number.isFinite(Number(slot.width)) ? Number(slot.width) : 1);
-            const height = Math.max(1, Number.isFinite(Number(slot.height)) ? Number(slot.height) : 1);
-            const isCircle = shape === 'circle';
-            const isTriangle = shape === 'triangle';
+        <div className="relative mt-3 flex-1 overflow-hidden rounded-2xl border border-[#f2e8ec]" style={{ backgroundColor: bgColor }}>
+          <SlotLayer slots={page.slots} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
-            return (
-              <article
-                key={`${page.pageNumber}-${slot.id}`}
-                className="absolute overflow-hidden border bg-[#faf8f9] shadow-[0_10px_24px_rgba(0,0,0,0.05)]"
-                style={{
-                  borderColor: `${accent || '#9b0044'}33`,
-                  left: `${left}%`,
-                  top: `${top}%`,
-                  width: `${width}%`,
-                  height: `${height}%`,
-                  borderRadius: isCircle ? '9999px' : isTriangle ? '1.1rem' : '1rem',
-                  clipPath: isTriangle ? 'polygon(50% 0%, 100% 100%, 0% 100%)' : undefined,
-                }}
-              >
-                <div className="absolute inset-0 bg-[linear-gradient(140deg,rgba(255,255,255,0.92),rgba(0,0,0,0.02))]" />
-                <div className="absolute inset-0 flex items-center justify-center p-3 text-center">
-                  <div>
-                    <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#8d7d81]">{slot.kind}</p>
-                    <p className="mt-1 text-[13px] font-semibold text-[#1a1c1d] md:text-[14px]">{slot.label || slot.id}</p>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
+function EndPage({ template }: { template: TemplateRecord }) {
+  const endColor = template.endPageDesign?.pageColor || template.pageColor || '#ffffff';
+  const endSlots = template.endPageDesign?.slots || [];
+  return (
+    <div className="h-full w-full bg-[#FFF8F7] p-2 md:p-3">
+      <div className="flex h-full flex-col overflow-hidden rounded-[1.2rem] border border-[#ede5e8] p-3 md:p-4 shadow-[0_14px_35px_rgba(0,0,0,0.06)]" style={{ backgroundColor: endColor }}>
+        <div className="flex items-center justify-between border-b border-[#f2e8ec] pb-2">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#8d7d81]">End Page</p>
+          <span className="text-[10px] uppercase tracking-[0.14em] text-[#8d7d81]">{endSlots.length} slots</span>
+        </div>
+        <div className="relative mt-3 flex-1 overflow-hidden rounded-2xl border border-[#f2e8ec]" style={{ backgroundColor: endColor }}>
+          <SlotLayer slots={endSlots} />
         </div>
       </div>
     </div>
@@ -172,9 +172,8 @@ export default function TemplateBookViewPage() {
   const params = useParams<{ templateId: string }>();
   const templateId = Array.isArray(params?.templateId) ? params.templateId[0] : params?.templateId;
   const router = useRouter();
-  const bookRef = useRef<any>(null);
+  const bookRef = useRef<FlipBookRef>(null);
   const bookHoverRef = useRef(false);
-  const autoFlipTimerRef = useRef<number | null>(null);
   const headerRef = useRef<HTMLDivElement | null>(null);
   const footerRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -192,7 +191,12 @@ export default function TemplateBookViewPage() {
 
   const totalSlots = useMemo(() => {
     if (!template) return 0;
-    return (template.pages || []).reduce((sum, page) => sum + (page.slots?.length || 0), 0) + (template.slots?.length || 0);
+    return (
+      (template.pages || []).reduce((sum, page) => sum + (page.slots?.length || 0), 0) +
+      (template.slots?.length || 0) +
+      (template.coverDesign?.slots?.length || 0) +
+      (template.endPageDesign?.slots?.length || 0)
+    );
   }, [template]);
 
   const playFlipSound = () => {
@@ -218,29 +222,6 @@ export default function TemplateBookViewPage() {
     oscillator.start();
     oscillator.stop(audioContext.currentTime + 0.2);
     oscillator.onended = () => audioContext.close().catch(() => undefined);
-  };
-
-  const stopAutoFlip = () => {
-    if (autoFlipTimerRef.current) {
-      window.clearInterval(autoFlipTimerRef.current);
-      autoFlipTimerRef.current = null;
-    }
-  };
-
-  const startAutoFlip = () => {
-    if (autoFlipTimerRef.current || pages.length <= 1) return;
-
-    autoFlipTimerRef.current = window.setInterval(() => {
-      if (bookHoverRef.current) return;
-
-      const totalPages = pages.length + 1;
-      if (currentPage >= totalPages - 1) {
-        stopAutoFlip();
-        return;
-      }
-
-      bookRef.current?.pageFlip?.().flipNext?.();
-    }, 2600);
   };
 
   useEffect(() => {
@@ -401,19 +382,22 @@ export default function TemplateBookViewPage() {
                 showCover
                 mobileScrollSupport
                 className="mx-auto"
-                onFlip={(event: any) => {
+                onFlip={(event: { data: number }) => {
                   setCurrentPage(event.data);
                   playFlipSound();
                 }}
               >
                 <div>
-                  <CoverPage template={template as TemplateRecord} accent={template?.accent || '#9b0044'} />
+                  <CoverPage template={template as TemplateRecord} />
                 </div>
                 {pages.map((page) => (
                   <div key={`${page.pageNumber}-${page.pageLabel || 'page'}`}>
-                    <BookPage page={page} accent={template?.accent || '#9b0044'} pageLabel={page.pageLabel || `Page ${page.pageNumber}`} />
+                    <BookPage page={page} pageLabel={page.pageLabel || `Page ${page.pageNumber}`} pageColor={template?.pageColor} />
                   </div>
                 ))}
+                <div>
+                  <EndPage template={template as TemplateRecord} />
+                </div>
               </FlipBook>
             </div>
           </div>
@@ -421,7 +405,7 @@ export default function TemplateBookViewPage() {
       </main>
 
       <footer ref={footerRef} className="border-t border-[#ead5dc] bg-[#FFF1F3] px-4 py-2 text-center text-[9px] font-bold uppercase tracking-[0.2em] text-[#8d7d81] md:px-6">
-        Page {Math.min(currentPage + 1, pages.length + 1)} of {pages.length + 1}
+        Page {Math.min(currentPage + 1, pages.length + 2)} of {pages.length + 2}
       </footer>
     </div>
   );

@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Circle, Move, Plus, Save, Square, Triangle, Trash2, Type } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { ArrowLeft, Pencil, Plus, Save, Trash2 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { apiFetch } from '@/lib/api';
 
@@ -22,7 +22,41 @@ type EditorSlot = {
 type EditorPage = {
   id: number;
   label: string;
+  pageColor: string;
   slots: EditorSlot[];
+};
+
+type EditorSpecialPage = {
+  pageColor: string;
+  slots: EditorSlot[];
+};
+
+type TemplateSlotInput = {
+  id?: string;
+  label?: string;
+  shape?: string;
+  kind?: string;
+  x?: unknown;
+  y?: unknown;
+  width?: unknown;
+  height?: unknown;
+};
+
+type TemplatePageInput = {
+  pageNumber?: number;
+  pageLabel?: string;
+  pageColor?: string;
+  slots?: TemplateSlotInput[];
+};
+
+type TemplateInput = {
+  name?: string;
+  description?: string;
+  accent?: string;
+  pageColor?: string;
+  pages?: TemplatePageInput[];
+  coverDesign?: { pageColor?: string; slots?: TemplateSlotInput[] };
+  endPageDesign?: { pageColor?: string; slots?: TemplateSlotInput[] };
 };
 
 type InteractionState = {
@@ -49,6 +83,11 @@ const createSlot = (shape: SlotShape, index: number): EditorSlot => ({
   height: shape === 'text' ? 14 : 18,
 });
 
+const createSpecialPage = (color = '#ffffff'): EditorSpecialPage => ({
+  pageColor: color,
+  slots: [],
+});
+
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
 const toTemplateKind = (shape: SlotShape) => {
@@ -57,7 +96,7 @@ const toTemplateKind = (shape: SlotShape) => {
   return 'frame';
 };
 
-const fromTemplateShape = (slot: any): SlotShape => {
+const fromTemplateShape = (slot?: Pick<TemplateSlotInput, 'shape' | 'kind'>): SlotShape => {
   if (slot?.shape === 'circle' || slot?.shape === 'triangle' || slot?.shape === 'text' || slot?.shape === 'square') {
     return slot.shape;
   }
@@ -82,7 +121,7 @@ const normalizeSlotSize = (value: unknown, fallback: number) => {
 
 function ShapePreview({ slot }: { slot: EditorSlot }) {
   if (slot.shape === 'circle') {
-    return <div className="h-full w-full rounded-full border-2 border-[#9b0044] bg-[#fff0f6]" />;
+    return <div className="h-full w-full rounded-full bg-[#f0f0f0]" />;
   }
 
   if (slot.shape === 'triangle') {
@@ -94,7 +133,7 @@ function ShapePreview({ slot }: { slot: EditorSlot }) {
             height: 0,
             borderLeft: '26px solid transparent',
             borderRight: '26px solid transparent',
-            borderBottom: '46px solid #f7d7e6',
+            borderBottom: '46px solid #f0f0f0',
           }}
         />
       </div>
@@ -102,21 +141,28 @@ function ShapePreview({ slot }: { slot: EditorSlot }) {
   }
 
   if (slot.shape === 'text') {
-    return <div className="flex h-full w-full items-center justify-center text-[11px] font-bold uppercase tracking-[0.16em] text-[#9b0044]">Text</div>;
+    return (
+      <div className="flex h-full w-full items-center justify-center rounded-lg bg-[#f9f9f9] p-2">
+        <p className="text-center text-[11px] font-medium text-[#1a1c1d] leading-tight">{slot.label}</p>
+      </div>
+    );
   }
 
-  return <div className="h-full w-full rounded-lg border-2 border-[#9b0044] bg-[#fff0f6]" />;
+  return <div className="h-full w-full rounded-lg bg-[#f0f0f0]" />;
 }
 
 export default function NewTemplatePage() {
   const search = useSearchParams();
-  const router = useRouter();
   const editingTemplateId = search?.get('templateId') || null;
   const storageKey = `${STORAGE_PREFIX}${editingTemplateId || 'new'}`;
   const [name, setName] = useState('Untitled Template');
   const [description, setDescription] = useState('');
   const [accent, setAccent] = useState('#9b0044');
-  const [pages, setPages] = useState<EditorPage[]>([{ id: 1, label: 'Page 1', slots: [] }]);
+  const [pageColor, setPageColor] = useState('#ffffff');
+  const [pages, setPages] = useState<EditorPage[]>([{ id: 1, label: 'Page 1', pageColor: '#ffffff', slots: [] }]);
+  const [coverDesign, setCoverDesign] = useState<EditorSpecialPage>(createSpecialPage('#ffffff'));
+  const [endPageDesign, setEndPageDesign] = useState<EditorSpecialPage>(createSpecialPage('#ffffff'));
+  const [activeCanvas, setActiveCanvas] = useState<'cover' | 'content' | 'end'>('content');
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [newSlotShape, setNewSlotShape] = useState<SlotShape>('square');
@@ -128,21 +174,47 @@ export default function NewTemplatePage() {
   const canvasRef = useRef<HTMLDivElement | null>(null);
 
   const currentPage = pages[currentPageIndex] || pages[0];
+  const activeSlots =
+    activeCanvas === 'cover'
+      ? coverDesign.slots
+      : activeCanvas === 'end'
+        ? endPageDesign.slots
+        : currentPage?.slots || [];
+  const activePageColor =
+    activeCanvas === 'cover'
+      ? coverDesign.pageColor
+      : activeCanvas === 'end'
+        ? endPageDesign.pageColor
+        : currentPage?.pageColor || pageColor;
 
   const selectedSlot = useMemo(
-    () => currentPage?.slots.find((slot) => slot.id === selectedSlotId) || null,
-    [currentPage, selectedSlotId]
+    () => activeSlots.find((slot) => slot.id === selectedSlotId) || null,
+    [activeSlots, selectedSlotId]
   );
 
   const updateSlot = (slotId: string, patch: Partial<EditorSlot>) => {
+    if (activeCanvas === 'cover') {
+      setCoverDesign((current) => ({
+        ...current,
+        slots: current.slots.map((slot) => (slot.id === slotId ? { ...slot, ...patch } : slot)),
+      }));
+      return;
+    }
+
+    if (activeCanvas === 'end') {
+      setEndPageDesign((current) => ({
+        ...current,
+        slots: current.slots.map((slot) => (slot.id === slotId ? { ...slot, ...patch } : slot)),
+      }));
+      return;
+    }
+
     setPages((current) =>
-      current.map((page, index) => {
-        if (index !== currentPageIndex) return page;
-        return {
-          ...page,
-          slots: page.slots.map((slot) => (slot.id === slotId ? { ...slot, ...patch } : slot)),
-        };
-      })
+      current.map((page, index) =>
+        index === currentPageIndex
+          ? { ...page, slots: page.slots.map((slot) => (slot.id === slotId ? { ...slot, ...patch } : slot)) }
+          : page
+      )
     );
   };
 
@@ -153,29 +225,46 @@ export default function NewTemplatePage() {
       name,
       description,
       accent,
+      pageColor,
       pages: draftPages,
+      coverDesign,
+      endPageDesign,
+      activeCanvas,
       currentPageIndex: draftIndex,
     };
 
     window.localStorage.setItem(storageKey, JSON.stringify(draft));
   };
 
-  const mapTemplateToEditor = (found: any) => {
-    const mappedPages: EditorPage[] = (found.pages || []).map((page: any, pageIndex: number) => ({
-      id: page.pageNumber || pageIndex + 1,
-      label: page.pageLabel || `Page ${page.pageNumber || pageIndex + 1}`,
-      slots: (page.slots || []).map((slot: any, slotIndex: number) => ({
-        id: slot.id || createId(),
-        label: slot.label || `Slot ${slotIndex + 1}`,
-        shape: fromTemplateShape(slot),
-        x: normalizeSlotPosition(slot.x, 8 + (slotIndex % 3) * 12),
-        y: normalizeSlotPosition(slot.y, 8 + Math.floor(slotIndex / 3) * 12),
-        width: normalizeSlotSize(slot.width, 20),
-        height: normalizeSlotSize(slot.height, 18),
-      })),
+  const normalizeSlotsForEditor = (slots: TemplateSlotInput[]) =>
+    (slots || []).map((slot, slotIndex: number) => ({
+      id: slot.id || createId(),
+      label: slot.label || `Slot ${slotIndex + 1}`,
+      shape: fromTemplateShape(slot),
+      x: normalizeSlotPosition(slot.x, 8 + (slotIndex % 3) * 12),
+      y: normalizeSlotPosition(slot.y, 8 + Math.floor(slotIndex / 3) * 12),
+      width: normalizeSlotSize(slot.width, 20),
+      height: normalizeSlotSize(slot.height, 18),
     }));
 
-    return mappedPages.length > 0 ? mappedPages : [{ id: 1, label: 'Page 1', slots: [] }];
+  const mapTemplateToEditor = (found: TemplateInput) => {
+    const mappedPages: EditorPage[] = (found.pages || []).map((page, pageIndex: number) => ({
+      id: page.pageNumber || pageIndex + 1,
+      label: page.pageLabel || `Page ${page.pageNumber || pageIndex + 1}`,
+      pageColor: page.pageColor || found.pageColor || '#ffffff',
+      slots: normalizeSlotsForEditor(page.slots || []),
+    }));
+
+    const normalizedPages = mappedPages.length > 0 ? mappedPages : [{ id: 1, label: 'Page 1', pageColor: found.pageColor || '#ffffff', slots: [] }];
+    const normalizedCover = {
+      pageColor: found.coverDesign?.pageColor || found.pageColor || '#ffffff',
+      slots: normalizeSlotsForEditor(found.coverDesign?.slots || []),
+    };
+    const normalizedEnd = {
+      pageColor: found.endPageDesign?.pageColor || found.pageColor || '#ffffff',
+      slots: normalizeSlotsForEditor(found.endPageDesign?.slots || []),
+    };
+    return { normalizedPages, normalizedCover, normalizedEnd };
   };
 
   useEffect(() => {
@@ -191,7 +280,11 @@ export default function NewTemplatePage() {
             setName(draft.name || 'Untitled Template');
             setDescription(draft.description || '');
             setAccent(draft.accent || '#9b0044');
-            setPages(Array.isArray(draft.pages) && draft.pages.length > 0 ? draft.pages : [{ id: 1, label: 'Page 1', slots: [] }]);
+            setPageColor(draft.pageColor || '#ffffff');
+            setPages(Array.isArray(draft.pages) && draft.pages.length > 0 ? draft.pages : [{ id: 1, label: 'Page 1', pageColor: '#ffffff', slots: [] }]);
+            setCoverDesign(draft.coverDesign || createSpecialPage(draft.pageColor || '#ffffff'));
+            setEndPageDesign(draft.endPageDesign || createSpecialPage(draft.pageColor || '#ffffff'));
+            setActiveCanvas(draft.activeCanvas === 'cover' || draft.activeCanvas === 'end' ? draft.activeCanvas : 'content');
             setCurrentPageIndex(typeof draft.currentPageIndex === 'number' ? draft.currentPageIndex : 0);
             setSelectedSlotId(null);
             setMessage('Recovered unsaved draft from local storage');
@@ -212,7 +305,12 @@ export default function NewTemplatePage() {
         setName(found.name || 'Untitled Template');
         setDescription(found.description || '');
         setAccent(found.accent || '#9b0044');
-        setPages(mapTemplateToEditor(found));
+        setPageColor(found.pageColor || '#ffffff');
+        const mapped = mapTemplateToEditor(found);
+        setPages(mapped.normalizedPages);
+        setCoverDesign(mapped.normalizedCover);
+        setEndPageDesign(mapped.normalizedEnd);
+        setActiveCanvas('content');
         setCurrentPageIndex(0);
         setSelectedSlotId(null);
       } catch (error) {
@@ -232,7 +330,7 @@ export default function NewTemplatePage() {
     if (isLoading) return;
 
     persistDraft(pages, currentPageIndex);
-  }, [name, description, accent, pages, currentPageIndex, isLoading]);
+  }, [name, description, accent, pageColor, pages, coverDesign, endPageDesign, activeCanvas, currentPageIndex, isLoading]);
 
   useEffect(() => {
     if (!interaction) return;
@@ -286,12 +384,30 @@ export default function NewTemplatePage() {
   };
 
   const addPage = () => {
-    setPages((current) => [...current, { id: current.length + 1, label: `Page ${current.length + 1}`, slots: [] }]);
+    setPages((current) => [...current, { id: current.length + 1, label: `Page ${current.length + 1}`, pageColor, slots: [] }]);
     setCurrentPageIndex(pages.length);
     setSelectedSlotId(null);
   };
 
   const addSlot = (shape: SlotShape) => {
+    if (activeCanvas === 'cover') {
+      setCoverDesign((current) => {
+        const nextSlot = createSlot(shape, current.slots.length);
+        setSelectedSlotId(nextSlot.id);
+        return { ...current, slots: [...current.slots, nextSlot] };
+      });
+      return;
+    }
+
+    if (activeCanvas === 'end') {
+      setEndPageDesign((current) => {
+        const nextSlot = createSlot(shape, current.slots.length);
+        setSelectedSlotId(nextSlot.id);
+        return { ...current, slots: [...current.slots, nextSlot] };
+      });
+      return;
+    }
+
     setPages((current) =>
       current.map((page, index) => {
         if (index !== currentPageIndex) return page;
@@ -303,12 +419,15 @@ export default function NewTemplatePage() {
   };
 
   const removeSlot = (slotId: string) => {
-    setPages((current) =>
-      current.map((page, index) => {
-        if (index !== currentPageIndex) return page;
-        return { ...page, slots: page.slots.filter((slot) => slot.id !== slotId) };
-      })
-    );
+    if (activeCanvas === 'cover') {
+      setCoverDesign((current) => ({ ...current, slots: current.slots.filter((slot) => slot.id !== slotId) }));
+    } else if (activeCanvas === 'end') {
+      setEndPageDesign((current) => ({ ...current, slots: current.slots.filter((slot) => slot.id !== slotId) }));
+    } else {
+      setPages((current) =>
+        current.map((page, index) => (index === currentPageIndex ? { ...page, slots: page.slots.filter((slot) => slot.id !== slotId) } : page))
+      );
+    }
 
     if (selectedSlotId === slotId) {
       setSelectedSlotId(null);
@@ -325,6 +444,7 @@ export default function NewTemplatePage() {
         pageLabel: page.label || `Page ${page.id}`,
         presetKey: 'custom-builder',
         accent,
+        pageColor: page.pageColor || pageColor,
         slots: page.slots.map((slot) => ({
           id: slot.id,
           label: slot.label,
@@ -343,6 +463,35 @@ export default function NewTemplatePage() {
         description,
         presetKey: 'custom-builder',
         accent,
+        pageColor,
+        coverDesign: {
+          pageColor: coverDesign.pageColor || pageColor,
+          slots: coverDesign.slots.map((slot) => ({
+            id: slot.id,
+            label: slot.label,
+            kind: toTemplateKind(slot.shape),
+            shape: slot.shape,
+            x: Math.round(slot.x),
+            y: Math.round(slot.y),
+            width: Math.round(slot.width),
+            height: Math.round(slot.height),
+            emphasis: 'default',
+          })),
+        },
+        endPageDesign: {
+          pageColor: endPageDesign.pageColor || pageColor,
+          slots: endPageDesign.slots.map((slot) => ({
+            id: slot.id,
+            label: slot.label,
+            kind: toTemplateKind(slot.shape),
+            shape: slot.shape,
+            x: Math.round(slot.x),
+            y: Math.round(slot.y),
+            width: Math.round(slot.width),
+            height: Math.round(slot.height),
+            emphasis: 'default',
+          })),
+        },
         slots: pagePayload[0]?.slots || [],
         pages: pagePayload,
         isActive: true,
@@ -436,20 +585,73 @@ export default function NewTemplatePage() {
             </div>
           </div>
 
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#594045]">Page Background Color</label>
+            <div className="flex items-center gap-3 rounded-xl border border-[#d1d1d6] bg-[#FEF6F6] px-3 py-2.5">
+              <input
+                type="color"
+                value={pageColor}
+                onChange={(event) => setPageColor(event.target.value)}
+                className="h-9 w-10 rounded-md border-0 bg-transparent p-0"
+                aria-label="Page background color"
+              />
+              <input
+                value={pageColor}
+                onChange={(event) => setPageColor(event.target.value)}
+                className="w-full bg-transparent text-[14px] outline-none"
+                placeholder="#ffffff"
+              />
+            </div>
+          </div>
+
           <div className="space-y-2 border-t border-[#f0dde3] pt-4">
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveCanvas('cover');
+                  setSelectedSlotId(null);
+                }}
+                className={`rounded-lg border px-2 py-2 text-[10px] font-bold uppercase tracking-[0.14em] ${activeCanvas === 'cover' ? 'border-[#9b0044] bg-[#9b0044] text-white' : 'border-[#e1bec4] text-[#7a6268]'}`}
+              >
+                Cover
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveCanvas('content');
+                  setSelectedSlotId(null);
+                }}
+                className={`rounded-lg border px-2 py-2 text-[10px] font-bold uppercase tracking-[0.14em] ${activeCanvas === 'content' ? 'border-[#9b0044] bg-[#9b0044] text-white' : 'border-[#e1bec4] text-[#7a6268]'}`}
+              >
+                Pages
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveCanvas('end');
+                  setSelectedSlotId(null);
+                }}
+                className={`rounded-lg border px-2 py-2 text-[10px] font-bold uppercase tracking-[0.14em] ${activeCanvas === 'end' ? 'border-[#9b0044] bg-[#9b0044] text-white' : 'border-[#e1bec4] text-[#7a6268]'}`}
+              >
+                End
+              </button>
+            </div>
+
             <div className="flex items-center justify-between">
               <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#594045]">Pages</label>
               <button
                 type="button"
                 onClick={addPage}
-                className="inline-flex items-center gap-1 rounded-full border border-[#e1bec4] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#7a6268] transition-colors hover:border-[#9b0044] hover:text-[#9b0044]"
+                disabled={activeCanvas !== 'content'}
+                className="inline-flex items-center gap-1 rounded-full border border-[#e1bec4] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#7a6268] transition-colors hover:border-[#9b0044] hover:text-[#9b0044] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Add
               </button>
             </div>
 
-            <div className="flex gap-2 overflow-x-auto pb-1">
+            <div className={`flex gap-2 overflow-x-auto pb-1 ${activeCanvas === 'content' ? '' : 'opacity-40 pointer-events-none'}`}>
               {pages.map((page, index) => (
                 <button
                   key={page.id}
@@ -468,13 +670,62 @@ export default function NewTemplatePage() {
             <label className="space-y-1 text-[12px] text-[#594045]">
               <span className="text-[10px] font-bold uppercase tracking-[0.16em]">Page Label</span>
               <input
-                value={currentPage?.label || `Page ${currentPage?.id || 1}`}
+                value={
+                  activeCanvas === 'cover'
+                    ? 'Cover Page'
+                    : activeCanvas === 'end'
+                      ? 'End Page'
+                      : currentPage?.label || `Page ${currentPage?.id || 1}`
+                }
                 onChange={(event) => {
                   const label = event.target.value;
+                  if (activeCanvas !== 'content') return;
                   setPages((current) => current.map((page, index) => (index === currentPageIndex ? { ...page, label } : page)));
                 }}
+                disabled={activeCanvas !== 'content'}
                 className="w-full rounded-xl border border-[#d1d1d6] bg-[#FEF6F6] px-3 py-2 text-[13px] outline-none transition focus:border-[#9b0044]"
               />
+            </label>
+            <label className="space-y-1 text-[12px] text-[#594045]">
+              <span className="text-[10px] font-bold uppercase tracking-[0.16em]">
+                {activeCanvas === 'cover' ? 'Cover Color' : activeCanvas === 'end' ? 'End Page Color' : 'Current Page Color'}
+              </span>
+              <div className="flex items-center gap-2 rounded-xl border border-[#d1d1d6] bg-[#FEF6F6] px-2.5 py-2">
+                <input
+                  type="color"
+                  value={activePageColor}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    if (activeCanvas === 'cover') {
+                      setCoverDesign((current) => ({ ...current, pageColor: value }));
+                      return;
+                    }
+                    if (activeCanvas === 'end') {
+                      setEndPageDesign((current) => ({ ...current, pageColor: value }));
+                      return;
+                    }
+                    setPages((current) => current.map((page, index) => (index === currentPageIndex ? { ...page, pageColor: value } : page)));
+                  }}
+                  className="h-8 w-9 rounded-md border-0 bg-transparent p-0"
+                  aria-label="Current page color"
+                />
+                <input
+                  value={activePageColor}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    if (activeCanvas === 'cover') {
+                      setCoverDesign((current) => ({ ...current, pageColor: value }));
+                      return;
+                    }
+                    if (activeCanvas === 'end') {
+                      setEndPageDesign((current) => ({ ...current, pageColor: value }));
+                      return;
+                    }
+                    setPages((current) => current.map((page, index) => (index === currentPageIndex ? { ...page, pageColor: value } : page)));
+                  }}
+                  className="w-full bg-transparent text-[13px] outline-none"
+                />
+              </div>
             </label>
           </div>
 
@@ -567,16 +818,18 @@ export default function NewTemplatePage() {
 
         <section className="rounded-2xl border border-[#e1bec4] bg-white p-4 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
           <div className="mb-4 flex items-center justify-between">
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#7a6268]">Page {currentPage?.id}</p>
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#7a6268]">{currentPage?.slots.length || 0} slots</p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#7a6268]">
+              {activeCanvas === 'cover' ? 'Cover Page' : activeCanvas === 'end' ? 'End Page' : `Page ${currentPage?.id}`}
+            </p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#7a6268]">{activeSlots.length} slots</p>
           </div>
 
           <div className="mx-auto aspect-4/3 w-full max-w-245 rounded-2xl border border-[#ead4dc] bg-[#fcf9fa] p-3">
-            <div ref={canvasRef} className="relative h-full w-full rounded-xl border border-[#e1bec4] bg-white">
-              {currentPage?.slots.map((slot) => (
+            <div ref={canvasRef} className="relative h-full w-full rounded-xl border border-[#e1bec4]" style={{ backgroundColor: activePageColor }}>
+              {activeSlots.map((slot) => (
                 <div
                   key={slot.id}
-                  className={`absolute overflow-hidden border-2 p-1 ${selectedSlotId === slot.id ? 'border-[#9b0044] shadow-[0_0_0_3px_rgba(155,0,68,0.16)]' : 'border-[#e6cfd7]'}`}
+                  className={`absolute overflow-hidden p-1 ${selectedSlotId === slot.id ? 'ring-2 ring-[#9b0044] shadow-[0_0_0_3px_rgba(155,0,68,0.16)]' : ''}`}
                   style={{
                     left: `${slot.x}%`,
                     top: `${slot.y}%`,
@@ -589,7 +842,7 @@ export default function NewTemplatePage() {
                     {slot.label}
                   </div>
                   <div className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-white/90 text-[#9b0044]">
-                    <Move className="h-3 w-3" />
+                    <Pencil className="h-3 w-3" />
                   </div>
 
                   <ShapePreview slot={slot} />

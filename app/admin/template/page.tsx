@@ -2,8 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { ArrowRight, BookOpen, LayoutTemplate, Plus } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { ArrowRight, BookOpen, LayoutTemplate, Plus, Search } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
 type TemplateRecord = {
@@ -15,6 +14,7 @@ type TemplateRecord = {
   slots?: unknown[];
   pages?: unknown[];
   updatedAt?: string;
+  usedByAlbums?: number;
 };
 
 function TemplateSkeletonCard() {
@@ -61,8 +61,19 @@ export default function TemplateListPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [loadNonce, setLoadNonce] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const accentFallback = '#9b0044';
+
+  const filteredTemplates = templates.filter((template) => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      template.name.toLowerCase().includes(query) ||
+      template.description?.toLowerCase().includes(query) ||
+      template.presetKey?.toLowerCase().includes(query)
+    );
+  });
 
   useEffect(() => {
     const loadTemplates = async () => {
@@ -73,7 +84,6 @@ export default function TemplateListPage() {
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to load templates';
         setMessage(errorMessage);
-        toast.error(errorMessage);
       } finally {
         setIsLoading(false);
       }
@@ -96,24 +106,36 @@ export default function TemplateListPage() {
     };
   }, []);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, usedByAlbums?: number) => {
+    if (usedByAlbums && usedByAlbums > 0) {
+      setMessage(`Cannot delete this template. It is currently used by ${usedByAlbums} album book${usedByAlbums > 1 ? 's' : ''}.`);
+      return;
+    }
+    
     if (!confirm('Delete this template? This cannot be undone.')) return;
     try {
-      await apiFetch(`/admin/templates/${id}`, { method: 'DELETE' });
+      const response = await apiFetch(`/admin/templates/${id}`, { method: 'DELETE' });
+      const result = await response.json();
+      
+      if (!response.ok) {
+        setMessage(result.message || 'Failed to delete template');
+        return;
+      }
+      
       setTemplates((t) => t.filter((x) => x._id !== id));
-      toast.success('Template deleted');
+      setMessage('Template deleted successfully');
     } catch (err) {
-      toast.error('Failed to delete template');
+      setMessage('Failed to delete template');
     }
   };
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(155,0,68,0.08),transparent_32%),linear-gradient(180deg,#fff7f8_0%,#fef6f6_56%,#fffdfd_100%)] text-[#1a1c1d]">
-      <header className="border-b border-[#e1bec4]/70 bg-[#FEF6F6]/90 backdrop-blur">
+    <div className="min-h-screen bg-[#FEF4F5] text-[#1a1c1d]">
+      <header className="border-b border-[#e1bec4]/70 bg-[#FEF4F5]/90 backdrop-blur">
         <div className="mx-auto flex max-w-400 flex-col gap-4 px-4 py-6 md:flex-row md:items-end md:justify-between md:px-6 lg:px-8">
           <div className="max-w-2xl">
-            <p className="text-[10px] font-bold uppercase tracking-[0.26em] text-[#7a6268]">Admin Dashboard</p>
-            <h1 className="font-['Libre_Caslon_Text'] text-[32px] leading-none text-[#9b0044] md:text-[40px]">Template Library</h1>
+            <p className="text-[10px] font-bold uppercase tracking-[0.26em] text-[#B10E6B]">Template save</p>
+            <h1 className="font-['Libre_Caslon_Text'] text-[32px] leading-none text-[#B10E6B] md:text-[40px]">Template Library</h1>
             <p className="mt-2 max-w-xl text-[13px] leading-6 text-[#6b5d60]">
               Create templates with frames, shape slots, and accent colors. The same accent is saved to the database and shown in the book preview.
             </p>
@@ -121,7 +143,7 @@ export default function TemplateListPage() {
 
           <Link
             href="/admin/template/new"
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#9b0044] px-4 py-3 text-[11px] font-bold uppercase tracking-[0.16em] text-white shadow-[0_10px_20px_rgba(155,0,68,0.18)] transition-opacity hover:opacity-95"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#B10E6B] px-4 py-3 text-[11px] font-bold uppercase tracking-[0.16em] text-white shadow-[0_10px_20px_rgba(177,14,107,0.18)] transition-opacity hover:opacity-95"
           >
             <Plus className="h-4 w-4" />
             Create Template
@@ -130,6 +152,24 @@ export default function TemplateListPage() {
       </header>
 
       <main className="mx-auto max-w-400 px-4 py-6 md:px-6 lg:px-8">
+        <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#B10E6B]/60" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search templates by name, description, or preset..."
+              className="w-full rounded-xl border border-[#e1bec4] bg-white py-3 pl-11 pr-4 text-[13px] text-[#1a1c1d] placeholder:text-[#8c7f83] shadow-[0_4px_12px_rgba(0,0,0,0.03)] transition-all focus:border-[#B10E6B] focus:shadow-[0_0_0_3px_rgba(177,14,107,0.12)] focus:outline-none"
+            />
+          </div>
+          <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.16em] text-[#7a6268]">
+            <span className="rounded-full bg-[#fff8fb] px-3 py-2 border border-[#f0dde3]">
+              {filteredTemplates.length} {filteredTemplates.length === 1 ? 'Template' : 'Templates'}
+            </span>
+          </div>
+        </div>
+
         {message ? (
           <div className="mb-5 rounded-2xl border border-[#e1bec4] bg-[#fff8fb] px-4 py-3 text-[13px] text-[#594045] shadow-[0_8px_22px_rgba(0,0,0,0.03)]">
             {message}
@@ -158,14 +198,26 @@ export default function TemplateListPage() {
               <TemplateSkeletonCard />
             </div>
           </div>
+        ) : filteredTemplates.length === 0 && searchQuery ? (
+          <div className="rounded-3xl border border-dashed border-[#e1bec4] bg-white px-5 py-12 text-center shadow-[0_16px_45px_rgba(0,0,0,0.04)]">
+            <Search className="mx-auto h-10 w-10 text-[#B10E6B]/60" />
+            <p className="mt-3 font-['Libre_Caslon_Text'] text-[24px] text-[#1a1c1d]">No templates found</p>
+            <p className="mt-2 text-[13px] text-[#7a6268]">Try adjusting your search query or create a new template.</p>
+            <button
+              onClick={() => setSearchQuery('')}
+              className="mt-5 inline-flex items-center gap-2 rounded-xl border border-[#B10E6B] px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[#B10E6B] transition-colors hover:bg-[#fff0f4]"
+            >
+              Clear Search
+            </button>
+          </div>
         ) : templates.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-[#e1bec4] bg-white px-5 py-12 text-center shadow-[0_16px_45px_rgba(0,0,0,0.04)]">
-            <LayoutTemplate className="mx-auto h-10 w-10 text-[#9b0044]/60" />
+            <LayoutTemplate className="mx-auto h-10 w-10 text-[#B10E6B]/60" />
             <p className="mt-3 font-['Libre_Caslon_Text'] text-[24px] text-[#1a1c1d]">No templates yet</p>
             <p className="mt-2 text-[13px] text-[#7a6268]">Create your first template with pages and shape slots.</p>
             <Link
               href="/admin/template/new"
-              className="mt-5 inline-flex items-center gap-2 rounded-xl border border-[#9b0044] px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[#9b0044] transition-colors hover:bg-[#fff0f4]"
+              className="mt-5 inline-flex items-center gap-2 rounded-xl border border-[#B10E6B] px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[#B10E6B] transition-colors hover:bg-[#fff0f4]"
             >
               Create Template
               <ArrowRight className="h-4 w-4" />
@@ -173,7 +225,7 @@ export default function TemplateListPage() {
           </div>
         ) : (
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {templates.map((template) => (
+            {filteredTemplates.map((template) => (
               <article key={template._id} className={`rounded-3xl border border-[#e1bec4] bg-white p-4 shadow-[0_12px_35px_rgba(0,0,0,0.05)] transition-transform hover:-translate-y-0.5 ${isLoading ? 'opacity-70' : ''}`}>
                 <div className="flex items-start justify-between gap-3">
                   <p className="font-['Libre_Caslon_Text'] text-[24px] leading-none text-[#1a1c1d]">{template.name}</p>
@@ -183,7 +235,7 @@ export default function TemplateListPage() {
                       style={{ backgroundColor: template.accent || accentFallback }}
                       aria-hidden="true"
                     />
-                    <span className="rounded-full bg-[#f5dce4] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#9b0044]">
+                    <span className="rounded-full bg-[#f5dce4] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#B10E6B]">
                       {template.presetKey || 'custom'}
                     </span>
                   </div>
@@ -206,27 +258,34 @@ export default function TemplateListPage() {
                   </div>
                 </div>
 
+                {template.usedByAlbums !== undefined && template.usedByAlbums > 0 ? (
+                  <div className="mt-3 rounded-xl border border-[#e1bec4] bg-[#fff8fb] px-3 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[#B10E6B]">
+                    Used by {template.usedByAlbums} Album Book{template.usedByAlbums > 1 ? 's' : ''}
+                  </div>
+                ) : null}
+
                 <p className="mt-4 text-[11px] uppercase tracking-[0.16em] text-[#8c7f83]">Updated {formatDate(template.updatedAt)}</p>
 
                 <div className="mt-4 flex items-center gap-2">
                   <Link
                     href={`/admin/template/${template._id}/book`}
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-[#9b0044] px-3 py-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[#9b0044] transition-colors hover:bg-[#fff0f4]"
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-[#B10E6B] px-3 py-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[#B10E6B] transition-colors hover:bg-[#fff0f4]"
                   >
                     <BookOpen className="h-4 w-4" />
                     Book View
                   </Link>
                   <Link
                     href={`/admin/template/new?templateId=${template._id}`}
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#9b0044] px-3 py-2 text-[11px] font-bold uppercase tracking-[0.16em] text-white transition-opacity hover:opacity-95"
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#B10E6B] px-3 py-2 text-[11px] font-bold uppercase tracking-[0.16em] text-white transition-opacity hover:opacity-95"
                   >
                     Open Builder
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                   <button
                     type="button"
-                    onClick={() => handleDelete(template._id)}
-                    className="inline-flex items-center gap-2 rounded-xl border border-[#e7bfc9] bg-white px-3 py-2 text-[11px] font-bold uppercase tracking-[0.12em] text-[#9b0044] hover:bg-[#fff0f4]"
+                    onClick={() => handleDelete(template._id, template.usedByAlbums)}
+                    disabled={template.usedByAlbums !== undefined && template.usedByAlbums > 0}
+                    className="inline-flex items-center gap-2 rounded-xl border border-[#e7bfc9] bg-white px-3 py-2 text-[11px] font-bold uppercase tracking-[0.12em] text-[#B10E6B] hover:bg-[#fff0f4] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Delete
                   </button>
