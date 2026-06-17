@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -151,7 +152,7 @@ function ShapePreview({ slot }: { slot: EditorSlot }) {
   return <div className="h-full w-full rounded-lg bg-[#f0f0f0]" />;
 }
 
-export default function NewTemplatePage() {
+function NewTemplatePage() {
   const search = useSearchParams();
   const editingTemplateId = search?.get('templateId') || null;
   const storageKey = `${STORAGE_PREFIX}${editingTemplateId || 'new'}`;
@@ -863,5 +864,21 @@ export default function NewTemplatePage() {
         </section>
       </main>
     </div>
+  );
+}
+export default function Page() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#FEF6F6]">
+          <div className="text-center">
+            <div className="animate-spin h-12 w-12 mx-auto mb-6 border-4 border-[#9b0044] border-t-transparent rounded-full"></div>
+            <p className="text-[#1a1c1d] text-lg">Loading Template Editor...</p>
+          </div>
+        </div>
+      }
+    >
+      <NewTemplatePage />
+    </Suspense>
   );
 }
