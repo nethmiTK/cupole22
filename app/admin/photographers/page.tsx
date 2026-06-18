@@ -221,7 +221,7 @@ export default function UserManagementPage() {
   const [showPassword, setShowPassword] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000/api';
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
   // Prevent background scroll
   useEffect(() => {
